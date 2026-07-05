@@ -32,7 +32,7 @@ jobs:
           python -m pip install --upgrade pip
           pip install httpx
 
-      # 🎯 【安全加锁 1】在运行抓取前，先备份当前的 hotel 目录，防止被 Python 脚本物理清空
+      # 🎯 【安全机制 1】在运行抓取前，先备份当前的 hotel 目录，防止被 Python 脚本物理清空
       - name: Backup Current Assets
         run: |
           if [ -d "hotel" ]; then
@@ -47,9 +47,7 @@ jobs:
           echo "🚀 开始执行酒店源自动化抓取与归属地解析..."
           python ./md/hotel_gather.py
 
-      # 🎯 【安全加锁 2】脚本跑完后，把备份里有、但被脚本不小心删掉的历史老文件全部还原回来！
-      # 这样即使脚本里有清空逻辑，老文件也会被原地复活，绝对不会丢失！
-       calm-restore:
+      # 🎯 【安全机制 2】脚本跑完后，把备份里有、但被脚本不小心删掉的历史老文件全部还原回来！
       - name: Restore Non-Updated Assets
         run: |
           if [ -d "hotel_backup" ]; then
@@ -68,9 +66,7 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # 🎯 【安全加锁 3】严禁添加整个文件夹！
-          # 我们只通过通配符精准暂存：存在的 m3u 文件、网页和账本。
-          # 这样 Git 只会记录“新增”和“修改”，那些没有被抓取到的老文件由于被我们复活了，不会被判定为删除！
+          # 🎯 【安全机制 3】精准锁定追加，拒绝同步任何删除动作
           git add hotel/*.m3u index.html snapshot.json
           
           if git diff --staged --quiet; then
