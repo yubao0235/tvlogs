@@ -2,22 +2,26 @@ name: Hotel IPTV Auto Gather
 
 on:
   schedule:
-    - cron: '10 */4 * * *'
-  workflow_dispatch:
-  push:
-    paths:
-      - 'md/hotel_gather.py'
+    - cron: '10 */4 * * *'  # 每 4 小时的第 10 分钟自动运行
+  workflow_dispatch:       # 允许你在公开库页面上手动点击按钮触发
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
   update_hotel:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout Repository
+      - name: Checkout Private Repo
         uses: actions/checkout@v4
         with:
-          # 获取所有历史，防止 push 冲突
+          # 🎯 核心控制：利用你配置好的私库 Token，跨库直接全量检出私库资产
+          repository: 'yubao0235/live'
+          token: ${{ secrets::LIVE_TOKEN }}
           fetch-depth: 0
+          persist-credentials: true         # 保持登录状态，允许后续的 git push 直接写回私库
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -29,27 +33,30 @@ jobs:
           python -m pip install --upgrade pip
           pip install httpx
 
+      # 🎯 此时容器在私库工作区根目录，直接运行私库里的 md/hotel_gather.py
       - name: Run Hotel Gather Script
         env:
           PYTHONUNBUFFERED: "1"  # 强制 Python 实时输出日志到控制台
         run: |
+          echo "🚀 开始执行酒店源自动化抓取与归属地解析..."
           python md/hotel_gather.py
 
-      - name: Commit and Push Changes
+      - name: Commit and Push Changes to Private Repo
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # 1. 强制添加所有 hotel 目录下的变动
+          # 1. 强制添加私库下 hotel/ 文件夹中所有最新抓取到的 .m3u 文件
           git add hotel/*.m3u
           
           # 2. 检查是否有变动需要提交
           if git diff --staged --quiet; then
-            echo "No changes detected, skipping commit."
+            echo "✅ 没有发现新抓取到的酒店源变动，跳过提交"
           else
             git commit -m "📊 覆盖更新：Hotel IPTV 列表 $(date +'%Y-%m-%d %H:%M') [skip ci]"
             
-            # 3. 关键改进：直接推送。如果怕冲突，可以使用 --force
-            # 在 Actions 中，我们通常希望最新的结果覆盖远程
+            # 3. 完美回写私库：这里由于是定时自动化覆盖更新，保持你原先的 --force 策略，
+            # 确保将私库远程的旧列表强制刷新为本次最新的扫描抓取结果！
+            echo "🚀 正在将最新抓取的基因强制推送到私库..."
             git push origin main --force
           fi
