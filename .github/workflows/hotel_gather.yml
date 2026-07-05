@@ -51,14 +51,15 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # 精准添加变动
-          git add hotel/*.m3u index.html snapshot.json
+          # 🎯 核心修复：精准暂存 hotel 目录的“所有变动”（包括新增、修改、以及被脚本干掉的删除动作）
+          git add hotel/ index.html snapshot.json
           
           if git diff --staged --quiet; then
             echo "✅ 没有发现任何变动，跳过提交"
           else
             git commit -m "📊 覆盖更新：Hotel IPTV 列表及快照大表 $(date +'%Y-%m-%d %H:%M') [skip ci]"
             
+            # 🎯 此时暂存区干干净净，变基同步将一路畅通无阻
             echo "🔄 正在同步远程私库并处理潜在冲突..."
             git pull --rebase -X ours origin main
             
