@@ -2,7 +2,7 @@ name: Hotel IPTV Auto Gather
 
 on:
   schedule:
-    - cron: '10 */4 * * '  # 每 4 小时的第 10 分钟自动运行
+    - cron: '10 */4 * * *'  # 每 4 小时的第 10 分钟自动运行
   workflow_dispatch:       # 允许你在公开库页面上手动点击按钮触发
 
 concurrency:
