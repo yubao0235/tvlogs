@@ -18,7 +18,7 @@ jobs:
         uses: actions/checkout@v4
         with:
           # 🎯 核心控制：让公开库的容器直接跨库去检出你的私库资产
-          repository: 'yubao0235/live'
+          repository: ${{ secrets.LIVE_REPO }}
           token: ${{ secrets.LIVE_TOKEN }}  # ✅ 已修正为标准的点号语法
           fetch-depth: 0
           persist-credentials: true         # 保持登录状态，允许后续的 git push 直接写回私库
