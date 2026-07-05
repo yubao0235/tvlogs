@@ -2,7 +2,7 @@ name: Hotel IPTV Auto Gather
 
 on:
   schedule:
-    - cron: '10 */4 * * *'  # 每 4 小时的第 10 分钟自动运行
+    - cron: '10 */4 * * '  # 每 4 小时的第 10 分钟自动运行
   workflow_dispatch:       # 允许你在公开库页面上手动点击按钮触发
 
 concurrency:
@@ -17,9 +17,9 @@ jobs:
       - name: Checkout Private Repo
         uses: actions/checkout@v4
         with:
-          # 🎯 核心控制：利用你配置好的私库 Token，跨库直接全量检出私库资产
+          # 🎯 核心控制：跨库直接全量检出私库资产
           repository: 'yubao0235/live'
-          token: ${{ secrets::LIVE_TOKEN }}
+          token: ${{ secrets.LIVE_TOKEN }}  # ✅ 已修正：去掉了多余的冒号，使用标准的点号点出变量
           fetch-depth: 0
           persist-credentials: true         # 保持登录状态，允许后续的 git push 直接写回私库
 
@@ -55,8 +55,7 @@ jobs:
           else
             git commit -m "📊 覆盖更新：Hotel IPTV 列表 $(date +'%Y-%m-%d %H:%M') [skip ci]"
             
-            # 3. 完美回写私库：这里由于是定时自动化覆盖更新，保持你原先的 --force 策略，
-            # 确保将私库远程的旧列表强制刷新为本次最新的扫描抓取结果！
+            # 3. 完美回写私库：强制刷新为本次最新的扫描抓取结果
             echo "🚀 正在将最新抓取的基因强制推送到私库..."
             git push origin main --force
           fi
