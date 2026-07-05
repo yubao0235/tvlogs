@@ -2,7 +2,7 @@ name: Hotel IPTV Daily Refresh
 
 on:
   schedule:
-    - cron: '20 */4 * * *'  # 严格的 5 位格式
+    - cron: '20 */4 * * *'  
   workflow_dispatch:       
 
 concurrency:
@@ -17,7 +17,7 @@ jobs:
       - name: Checkout Private Repo
         uses: actions/checkout@v4
         with:
-          repository: 'yubao0235/live'
+          repository: ${{ secrets.LIVE_REPO }}
           token: ${{ secrets.LIVE_TOKEN }}  
           fetch-depth: 0
           persist-credentials: true         
@@ -50,10 +50,8 @@ jobs:
             echo "⚠️ 找不到测速脚本"
           fi
 
-      # 🎯 【新增步骤】调用新编写的 HTML 页面生成脚本
       - name: Generate Web Index
         run: |
-          echo "🌐 正在根据测速结果和列表生成 index.html..."
           python md/generate_index.py
 
       - name: Commit and Push to Private Repo
@@ -61,8 +59,8 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 暂存所有修改（包括根目录下新生成的 index.html）
-          git add -A
+          # 🎯 核心修复：严禁使用 git add -A！精准锁定变动范围
+          git add hotels/*.m3u md/traffic_report.txt md/traffic_summary.json index.html snapshot.json
           
           if git diff --staged --quiet; then
             echo "✅ 没有发现变动，跳过提交"
