@@ -32,22 +32,26 @@ jobs:
           python -m pip install --upgrade pip
           pip install httpx
 
+      # 🎯 强制在检出后的根路径下运行，确保读取私库 md/ 目录
       - name: Run Hotel Gather Script
         env:
           PYTHONUNBUFFERED: "1"  
         run: |
-          python md/hotel_gather.py
+          echo "🚀 开始执行酒店源自动化抓取与归属地解析..."
+          python ./md/hotel_gather.py
 
+      # 🎯 强制在检出后的根路径下运行，确保读取私库 md/ 目录
       - name: Generate Web Index
         run: |
-          python md/generate_index.py
+          echo "🌐 [联动] 正在同步更新前端静态大表..."
+          python ./md/generate_index.py
 
       - name: Commit and Push Changes to Private Repo
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # 🎯 核心修复：严禁使用 git add -A！只精准添加这个工作流产生变动的文件
+          # 精准添加变动
           git add hotel/*.m3u index.html snapshot.json
           
           if git diff --staged --quiet; then
@@ -55,7 +59,6 @@ jobs:
           else
             git commit -m "📊 覆盖更新：Hotel IPTV 列表及快照大表 $(date +'%Y-%m-%d %H:%M') [skip ci]"
             
-            # 🎯 核心修复：取消 --force 强推！采用安全变基策略推送，绝不覆盖私库的其他历史或文件
             echo "🔄 正在同步远程私库并处理潜在冲突..."
             git pull --rebase -X ours origin main
             
