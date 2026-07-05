@@ -2,7 +2,7 @@ name: Hotel IPTV Daily Refresh
 
 on:
   schedule:
-    - cron: '20 */4 * * *'  
+    - cron: '20 */4 * * *'  # 严格的 5 位格式
   workflow_dispatch:       
 
 concurrency:
@@ -32,6 +32,14 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install requests tqdm urllib3 aiohttp
 
+      # 🎯 【安全护甲 1】运行前强行备份大表成品库 hotels 目录
+      - name: Backup Current Finished Assets
+        run: |
+          if [ -d "hotels" ]; then
+            cp -r hotels hotels_backup
+            echo "✅ 成功为洗版成品资产库建立安全防区"
+          fi
+
       - name: Real-time Execution Scan
         env:
           PYTHONUNBUFFERED: "1"
@@ -50,6 +58,15 @@ jobs:
             echo "⚠️ 找不到测速脚本"
           fi
 
+      # 🎯 【安全护甲 2】脚本与测速跑完后，利用 cp -n 完美借尸还魂，确保没发生更新的历史源百分之百存活
+      - name: Restore Non-Updated Finished Assets
+        run: |
+          if [ -d "hotels_backup" ]; then
+            echo "🔄 正在比对并强制补回未参与本次洗版的历史成品资产..."
+            cp -n hotels_backup/* hotels/ 2>/dev/null || true
+            rm -rf hotels_backup
+          fi
+
       - name: Generate Web Index
         run: |
           python md/generate_index.py
@@ -59,7 +76,7 @@ jobs:
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 🎯 核心修复：严禁使用 git add -A！精准锁定变动范围
+          # 🎯 【安全护甲 3】只精准锁定可能更新的文件与最终大表，不给 Git 任何机会去同步删除动作
           git add hotels/*.m3u md/traffic_report.txt md/traffic_summary.json index.html snapshot.json
           
           if git diff --staged --quiet; then
