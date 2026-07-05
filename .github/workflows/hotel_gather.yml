@@ -32,7 +32,14 @@ jobs:
           python -m pip install --upgrade pip
           pip install httpx
 
-      # 🎯 强制在检出后的根路径下运行，确保读取私库 md/ 目录
+      # 🎯 【安全加锁 1】在运行抓取前，先备份当前的 hotel 目录，防止被 Python 脚本物理清空
+      - name: Backup Current Assets
+        run: |
+          if [ -d "hotel" ]; then
+            cp -r hotel hotel_backup
+            echo "✅ 成功为现有资产建立安全防区"
+          fi
+
       - name: Run Hotel Gather Script
         env:
           PYTHONUNBUFFERED: "1"  
@@ -40,7 +47,17 @@ jobs:
           echo "🚀 开始执行酒店源自动化抓取与归属地解析..."
           python ./md/hotel_gather.py
 
-      # 🎯 强制在检出后的根路径下运行，确保读取私库 md/ 目录
+      # 🎯 【安全加锁 2】脚本跑完后，把备份里有、但被脚本不小心删掉的历史老文件全部还原回来！
+      # 这样即使脚本里有清空逻辑，老文件也会被原地复活，绝对不会丢失！
+       calm-restore:
+      - name: Restore Non-Updated Assets
+        run: |
+          if [ -d "hotel_backup" ]; then
+            echo "🔄 正在比对并强制补回非更新的历史资产..."
+            cp -n hotel_backup/* hotel/ 2>/dev/null || true
+            rm -rf hotel_backup
+          fi
+
       - name: Generate Web Index
         run: |
           echo "🌐 [联动] 正在同步更新前端静态大表..."
@@ -51,15 +68,16 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # 🎯 核心修复：精准暂存 hotel 目录的“所有变动”（包括新增、修改、以及被脚本干掉的删除动作）
-          git add hotel/ index.html snapshot.json
+          # 🎯 【安全加锁 3】严禁添加整个文件夹！
+          # 我们只通过通配符精准暂存：存在的 m3u 文件、网页和账本。
+          # 这样 Git 只会记录“新增”和“修改”，那些没有被抓取到的老文件由于被我们复活了，不会被判定为删除！
+          git add hotel/*.m3u index.html snapshot.json
           
           if git diff --staged --quiet; then
-            echo "✅ 没有发现任何变动，跳过提交"
+            echo "✅ 没有发现任何新内容变动，跳过提交"
           else
-            git commit -m "📊 覆盖更新：Hotel IPTV 列表及快照大表 $(date +'%Y-%m-%d %H:%M') [skip ci]"
+            git commit -m "📊 增量覆盖更新：Hotel IPTV 列表及快照大表 $(date +'%Y-%m-%d %H:%M') [skip ci]"
             
-            # 🎯 此时暂存区干干净净，变基同步将一路畅通无阻
             echo "🔄 正在同步远程私库并处理潜在冲突..."
             git pull --rebase -X ours origin main
             
