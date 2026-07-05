@@ -2,13 +2,9 @@ name: Hotel IPTV Daily Refresh
 
 on:
   schedule:
-    - cron: '20 */4 * * *'
-  workflow_dispatch:
-  push:
-    paths:
-      - 'hotels/ALL.m3u'
+    - cron: '20 */4 * * *'  # 每 4 小时的第 20 分钟自动运行
+  workflow_dispatch:       # 允许你在公开库页面上手动点击按钮触发
 
-# 【新增】并发控制：防止多个任务同时运行导致冲突
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
   cancel-in-progress: true
@@ -16,15 +12,16 @@ concurrency:
 jobs:
   refresh:
     runs-on: ubuntu-latest
-    permissions:
-      contents: write
 
     steps:
-      - name: Checkout
+      - name: Checkout Private Repo
         uses: actions/checkout@v4
         with:
-          # 【新增】获取完整的提交历史，确保 rebase 有足够的上下文
+          # 🎯 核心控制：让公开库的容器直接跨库去检出你的私库资产
+          repository: 'yubao0235/live'
+          token: ${{ secrets.LIVE_TOKEN }}  # ✅ 已修正为标准的点号语法
           fetch-depth: 0
+          persist-credentials: true         # 保持登录状态，允许后续的 git push 直接写回私库
 
       - name: Setup Python
         uses: actions/setup-python@v5
@@ -36,36 +33,37 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install requests tqdm urllib3 aiohttp
 
+      # 🎯 容器此时身处私库的工作区根目录下，直接调用 md/ 目录下的脚本即可
       - name: Real-time Execution Scan
         env:
           PYTHONUNBUFFERED: "1"
         run: |
-          echo "🚀 开始实时扫描..."
+          echo "🚀 开始从私库的 hotel/ 目录扫描基因..."
           python md/scan_hotel.py
 
       - name: Rebuild M3U Lists
         run: |
-          echo "🔄 正在构建列表文件..."
+          echo "🔄 正在清洗并重构 M3U 列表到 hotels/ 目录..."
           python md/rebuild_m3u.py
 
       - name: IPTV Speed Test
         run: |
-          echo "⚡ 对最新 ALL.m3u 执行测速..."
+          echo "⚡ 开始对最新生成的 ALL.m3u 执行并发测速..."
           if [ -f "md/traffic_test.py" ]; then
             python md/traffic_test.py
           else
             echo "⚠️ 找不到测速脚本"
           fi
 
-      - name: Commit and Push
+      - name: Commit and Push to Private Repo
         run: |
           git config --global user.name "github-actions[bot]"
           git config --global user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 1. 暂存所有更改
+          # 1. 暂存所有私库中新生成的变动文件（hotels/下的M3U、hotel_output.txt、以及测速报告）
           git add -A
           
-          # 2. 检查是否有实际变动
+          # 2. 检查是否有实际变动，没有就直接安全退出
           if git diff --staged --quiet; then
             echo "✅ 没有发现变动，跳过提交"
             exit 0
@@ -74,12 +72,10 @@ jobs:
           # 3. 提交变动
           git commit -m "📊 IPTV Refresh & Speed Test: $(date +'%Y-%m-%d %H:%M') [skip ci]"
 
-          # 4. 【核心改进】强制拉取并解决冲突
-          # -X ours: 如果远程和本地都有改动，保留“我们的”（即本次 Action 刚生成的）
-          # 这对于自动生成的测速报告和列表文件非常有效
-          echo "🔄 正在同步远程仓库并强制处理冲突..."
+          # 4. 强制拉取远程私库并进行变基合并，完美处理多端冲突
+          echo "🔄 正在同步远程私库并采用 rebase -X ours 策略处理潜在冲突..."
           git pull --rebase -X ours origin main
 
-          # 5. 推送
-          echo "🚀 正在推送到仓库..."
+          # 5. 将所有的更新无缝推回私库
+          echo "🚀 正在将最新结果推送到私库..."
           git push origin main
