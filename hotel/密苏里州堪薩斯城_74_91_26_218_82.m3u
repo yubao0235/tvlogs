@@ -1,0 +1,15 @@
+#EXTM3U
+#EXTINF:-1 group-title="74.91.26.218:82",江苏卫视
+http://74.91.26.218:82/live/jswshd.m3u8
+#EXTINF:-1 group-title="74.91.26.218:82",浙江卫视
+http://74.91.26.218:82/live/zjwshd.m3u8
+#EXTINF:-1 group-title="74.91.26.218:82",东方卫视
+http://74.91.26.218:82/live/dfwshd.m3u8
+#EXTINF:-1 group-title="74.91.26.218:82",深圳卫视
+http://74.91.26.218:82/live/szwshd.m3u8
+#EXTINF:-1 group-title="74.91.26.218:82",广东卫视
+http://74.91.26.218:82/live/gdwshd.m3u8
+#EXTINF:-1 group-title="74.91.26.218:82",湖南卫视
+http://74.91.26.218:82/live/hnwshd.m3u8
+#EXTINF:-1 group-title="74.91.26.218:82",大湾区卫视
+http://74.91.26.218:82/live/nfws.m3u8

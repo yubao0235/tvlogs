@@ -1,0 +1,30 @@
+name: Aggregate Hotel IPTV List
+
+on:
+  workflow_dispatch:        # 允许手动点击运行
+
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Code
+        uses: actions/checkout@v3
+
+      - name: Set up Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: '3.10'
+
+      - name: Run Aggregate Script
+        run: |
+          python md/test_check.py  # 运行下面为你准备的脚本
+
+      - name: Commit and Push
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          git add hotel.txt
+          # 只有在文件有变化时才 commit，防止报错
+          git diff --quiet && git diff --staged --quiet || (git commit -m "Update: $(date +'%Y-%m-%d') aggregated hotel list" && git push)

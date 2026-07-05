@@ -1,0 +1,81 @@
+#EXTM3U
+#EXTINF:-1 group-title="125.42.122.180:5566",CCTV1
+http://125.42.122.180:5566/hls/1/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",CCTV2
+http://125.42.122.180:5566/hls/2/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",CCTV3
+http://125.42.122.180:5566/hls/3/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",CCTV4
+http://125.42.122.180:5566/hls/4/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",CCTV5
+http://125.42.122.180:5566/hls/5/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",CCTV6
+http://125.42.122.180:5566/hls/6/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",CCTV7
+http://125.42.122.180:5566/hls/7/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",CCTV8
+http://125.42.122.180:5566/hls/8/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",CCTV9
+http://125.42.122.180:5566/hls/9/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",CCTV10
+http://125.42.122.180:5566/hls/10/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",CCTV11
+http://125.42.122.180:5566/hls/11/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",CCTV12
+http://125.42.122.180:5566/hls/12/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",CCTV13
+http://125.42.122.180:5566/hls/13/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",CCTV14
+http://125.42.122.180:5566/hls/14/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",CCTV15
+http://125.42.122.180:5566/hls/15/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",CCTV5+
+http://125.42.122.180:5566/hls/16/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",河南卫视
+http://125.42.122.180:5566/hls/17/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",浙江卫视
+http://125.42.122.180:5566/hls/18/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",东方卫视
+http://125.42.122.180:5566/hls/19/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",安徽卫视
+http://125.42.122.180:5566/hls/21/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",天津卫视
+http://125.42.122.180:5566/hls/20/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",湖北卫视
+http://125.42.122.180:5566/hls/23/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",山东卫视
+http://125.42.122.180:5566/hls/22/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",深圳卫视
+http://125.42.122.180:5566/hls/24/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",黑龙江卫视
+http://125.42.122.180:5566/hls/25/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",北京卫视
+http://125.42.122.180:5566/hls/26/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",湖南卫视
+http://125.42.122.180:5566/hls/27/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",江苏卫视
+http://125.42.122.180:5566/hls/28/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",辽宁卫视
+http://125.42.122.180:5566/hls/30/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",江西卫视
+http://125.42.122.180:5566/hls/31/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",四川卫视
+http://125.42.122.180:5566/hls/32/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",云南卫视
+http://125.42.122.180:5566/hls/33/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",郑州商都高清
+http://125.42.122.180:5566/hls/49/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",郑州文体高清
+http://125.42.122.180:5566/hls/50/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",河南都市频道
+http://125.42.122.180:5566/hls/51/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",河南民生
+http://125.42.122.180:5566/hls/52/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",河南法制
+http://125.42.122.180:5566/hls/53/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",河南电视剧
+http://125.42.122.180:5566/hls/54/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",河南新闻
+http://125.42.122.180:5566/hls/55/index.m3u8
+#EXTINF:-1 group-title="125.42.122.180:5566",河南公共频道
+http://125.42.122.180:5566/hls/56/index.m3u8

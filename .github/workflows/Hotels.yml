@@ -1,0 +1,85 @@
+name: Hotel IPTV Daily Refresh
+
+on:
+  schedule:
+    - cron: '20 */4 * * *'
+  workflow_dispatch:
+  push:
+    paths:
+      - 'hotels/ALL.m3u'
+
+# 【新增】并发控制：防止多个任务同时运行导致冲突
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  refresh:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: write
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+        with:
+          # 【新增】获取完整的提交历史，确保 rebase 有足够的上下文
+          fetch-depth: 0
+
+      - name: Setup Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          python -m pip install requests tqdm urllib3 aiohttp
+
+      - name: Real-time Execution Scan
+        env:
+          PYTHONUNBUFFERED: "1"
+        run: |
+          echo "🚀 开始实时扫描..."
+          python md/scan_hotel.py
+
+      - name: Rebuild M3U Lists
+        run: |
+          echo "🔄 正在构建列表文件..."
+          python md/rebuild_m3u.py
+
+      - name: IPTV Speed Test
+        run: |
+          echo "⚡ 对最新 ALL.m3u 执行测速..."
+          if [ -f "md/traffic_test.py" ]; then
+            python md/traffic_test.py
+          else
+            echo "⚠️ 找不到测速脚本"
+          fi
+
+      - name: Commit and Push
+        run: |
+          git config --global user.name "github-actions[bot]"
+          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 1. 暂存所有更改
+          git add -A
+          
+          # 2. 检查是否有实际变动
+          if git diff --staged --quiet; then
+            echo "✅ 没有发现变动，跳过提交"
+            exit 0
+          fi
+
+          # 3. 提交变动
+          git commit -m "📊 IPTV Refresh & Speed Test: $(date +'%Y-%m-%d %H:%M') [skip ci]"
+
+          # 4. 【核心改进】强制拉取并解决冲突
+          # -X ours: 如果远程和本地都有改动，保留“我们的”（即本次 Action 刚生成的）
+          # 这对于自动生成的测速报告和列表文件非常有效
+          echo "🔄 正在同步远程仓库并强制处理冲突..."
+          git pull --rebase -X ours origin main
+
+          # 5. 推送
+          echo "🚀 正在推送到仓库..."
+          git push origin main

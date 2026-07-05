@@ -1,0 +1,187 @@
+#EXTM3U
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV1
+http://122.114.131.154:8010/hls/1/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV2
+http://122.114.131.154:8010/hls/2/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV3
+http://122.114.131.154:8010/hls/3/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV4
+http://122.114.131.154:8010/hls/4/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV5
+http://122.114.131.154:8010/hls/5/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV6
+http://122.114.131.154:8010/hls/6/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV7
+http://122.114.131.154:8010/hls/7/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV8
+http://122.114.131.154:8010/hls/8/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV9
+http://122.114.131.154:8010/hls/9/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV10
+http://122.114.131.154:8010/hls/10/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV11
+http://122.114.131.154:8010/hls/11/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV12
+http://122.114.131.154:8010/hls/12/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV13
+http://122.114.131.154:8010/hls/13/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV14
+http://122.114.131.154:8010/hls/14/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV15
+http://122.114.131.154:8010/hls/15/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV5+
+http://122.114.131.154:8010/hls/16/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",河南卫视
+http://122.114.131.154:8010/hls/17/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",浙江卫视
+http://122.114.131.154:8010/hls/18/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",东方卫视
+http://122.114.131.154:8010/hls/19/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",天津卫视
+http://122.114.131.154:8010/hls/20/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",安徽卫视
+http://122.114.131.154:8010/hls/21/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",山东卫视
+http://122.114.131.154:8010/hls/22/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",湖北卫视
+http://122.114.131.154:8010/hls/23/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",深圳卫视
+http://122.114.131.154:8010/hls/24/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",黑龙江卫视
+http://122.114.131.154:8010/hls/25/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",北京卫视
+http://122.114.131.154:8010/hls/26/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",湖南卫视
+http://122.114.131.154:8010/hls/27/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",江苏卫视
+http://122.114.131.154:8010/hls/28/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",辽宁卫视
+http://122.114.131.154:8010/hls/29/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",江西卫视
+http://122.114.131.154:8010/hls/30/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",四川卫视
+http://122.114.131.154:8010/hls/31/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",云南卫视
+http://122.114.131.154:8010/hls/32/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",贵州卫视
+http://122.114.131.154:8010/hls/33/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",东南卫视
+http://122.114.131.154:8010/hls/34/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",重庆卫视
+http://122.114.131.154:8010/hls/35/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",广西卫视
+http://122.114.131.154:8010/hls/36/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",河北卫视
+http://122.114.131.154:8010/hls/37/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",吉林卫视
+http://122.114.131.154:8010/hls/38/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",山西卫视
+http://122.114.131.154:8010/hls/39/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",陕西卫视
+http://122.114.131.154:8010/hls/40/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",甘肃卫视
+http://122.114.131.154:8010/hls/41/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",厦门卫视
+http://122.114.131.154:8010/hls/42/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",郑州时政高清
+http://122.114.131.154:8010/hls/48/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",郑州商都高清
+http://122.114.131.154:8010/hls/49/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",郑州文体高清
+http://122.114.131.154:8010/hls/50/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",高清纪实
+http://122.114.131.154:8010/hls/59/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",谍战剧场
+http://122.114.131.154:8010/hls/66/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",BTV动画
+http://122.114.131.154:8010/hls/43/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",IPTV5+
+http://122.114.131.154:8010/hls/46/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",睛彩中原
+http://122.114.131.154:8010/hls/47/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",影视戏曲
+http://122.114.131.154:8010/hls/62/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",妇女儿童
+http://122.114.131.154:8010/hls/63/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",相声小品
+http://122.114.131.154:8010/hls/67/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",法制
+http://122.114.131.154:8010/hls/68/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",少儿动画
+http://122.114.131.154:8010/hls/69/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",中国教育1
+http://122.114.131.154:8010/hls/70/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",中国教育4
+http://122.114.131.154:8010/hls/71/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",音乐现场
+http://122.114.131.154:8010/hls/72/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",好学生
+http://122.114.131.154:8010/hls/74/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",国学
+http://122.114.131.154:8010/hls/75/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",早教
+http://122.114.131.154:8010/hls/76/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",军事
+http://122.114.131.154:8010/hls/77/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV-1 综合
+http://122.114.131.154:8010/hls/1/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV-2 财经
+http://122.114.131.154:8010/hls/2/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV-3 综艺
+http://122.114.131.154:8010/hls/3/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV-4 中文国际
+http://122.114.131.154:8010/hls/4/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV-5 体育
+http://122.114.131.154:8010/hls/5/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV-5+ 体育赛事
+http://122.114.131.154:8010/hls/16/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV-6 电影
+http://122.114.131.154:8010/hls/6/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV-7 国防军事
+http://122.114.131.154:8010/hls/7/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV-8 电视剧
+http://122.114.131.154:8010/hls/8/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV-9 纪录
+http://122.114.131.154:8010/hls/9/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV-10 科教
+http://122.114.131.154:8010/hls/10/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV-11 戏曲
+http://122.114.131.154:8010/hls/11/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV-12 社会与法
+http://122.114.131.154:8010/hls/12/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV-13 新闻
+http://122.114.131.154:8010/hls/13/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV-14 少儿
+http://122.114.131.154:8010/hls/14/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",CCTV-15 音乐
+http://122.114.131.154:8010/hls/15/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",经典电影
+http://122.114.131.154:8010/hls/65/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",河南都市频道
+http://122.114.131.154:8010/hls/51/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",河南民生
+http://122.114.131.154:8010/hls/52/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",河南法制
+http://122.114.131.154:8010/hls/53/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",河南电视剧
+http://122.114.131.154:8010/hls/54/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",河南新闻
+http://122.114.131.154:8010/hls/55/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",河南公共频道
+http://122.114.131.154:8010/hls/56/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",河南新农村频道
+http://122.114.131.154:8010/hls/57/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",河南国际频道
+http://122.114.131.154:8010/hls/58/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",嘉佳卡通
+http://122.114.131.154:8010/hls/45/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",金鹰卡通
+http://122.114.131.154:8010/hls/44/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",梨园频道
+http://122.114.131.154:8010/hls/60/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",武术世界
+http://122.114.131.154:8010/hls/61/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",都市生活
+http://122.114.131.154:8010/hls/64/index.m3u8
+#EXTINF:-1 group-title="122.114.131.154:8010",爱生活
+http://122.114.131.154:8010/hls/73/index.m3u8

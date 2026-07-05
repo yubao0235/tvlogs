@@ -1,0 +1,55 @@
+name: Hotel IPTV Auto Gather
+
+on:
+  schedule:
+    - cron: '10 */4 * * *'
+  workflow_dispatch:
+  push:
+    paths:
+      - 'md/hotel_gather.py'
+
+jobs:
+  update_hotel:
+    runs-on: ubuntu-latest
+    
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          # 获取所有历史，防止 push 冲突
+          fetch-depth: 0
+
+      - name: Set up Python
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Install Dependencies
+        run: |
+          python -m pip install --upgrade pip
+          pip install httpx
+
+      - name: Run Hotel Gather Script
+        env:
+          PYTHONUNBUFFERED: "1"  # 强制 Python 实时输出日志到控制台
+        run: |
+          python md/hotel_gather.py
+
+      - name: Commit and Push Changes
+        run: |
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # 1. 强制添加所有 hotel 目录下的变动
+          git add hotel/*.m3u
+          
+          # 2. 检查是否有变动需要提交
+          if git diff --staged --quiet; then
+            echo "No changes detected, skipping commit."
+          else
+            git commit -m "📊 覆盖更新：Hotel IPTV 列表 $(date +'%Y-%m-%d %H:%M') [skip ci]"
+            
+            # 3. 关键改进：直接推送。如果怕冲突，可以使用 --force
+            # 在 Actions 中，我们通常希望最新的结果覆盖远程
+            git push origin main --force
+          fi
