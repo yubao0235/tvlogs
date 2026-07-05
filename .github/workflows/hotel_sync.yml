@@ -17,11 +17,10 @@ jobs:
       - name: Checkout Private Repo
         uses: actions/checkout@v4
         with:
-          # 🎯 核心控制：跨库直接全量检出私库资产
           repository: ${{ secrets.LIVE_REPO }}
-          token: ${{ secrets.LIVE_TOKEN }}  # ✅ 已修正：去掉了多余的冒号，使用标准的点号点出变量
+          token: ${{ secrets.LIVE_TOKEN }}  
           fetch-depth: 0
-          persist-credentials: true         # 保持登录状态，允许后续的 git push 直接写回私库
+          persist-credentials: true         
 
       - name: Set up Python
         uses: actions/setup-python@v5
@@ -33,29 +32,33 @@ jobs:
           python -m pip install --upgrade pip
           pip install httpx
 
-      # 🎯 此时容器在私库工作区根目录，直接运行私库里的 md/hotel_gather.py
+      # 1. 正常运行你的抓取源脚本
       - name: Run Hotel Gather Script
         env:
-          PYTHONUNBUFFERED: "1"  # 强制 Python 实时输出日志到控制台
+          PYTHONUNBUFFERED: "1"  
         run: |
           echo "🚀 开始执行酒店源自动化抓取与归属地解析..."
           python md/hotel_gather.py
+
+      # 🎯 2.【精妙联动】抓取完新源后，立刻原地重新生成静态大表账本
+      - name: Generate Web Index
+        run: |
+          echo "🌐 [联动] 检测到新源抓取完毕，正在实时同步更新前端静态大表..."
+          python md/generate_index.py
 
       - name: Commit and Push Changes to Private Repo
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # 1. 强制添加私库下 hotel/ 文件夹中所有最新抓取到的 .m3u 文件
-          git add hotel/*.m3u
+          # 🎯 优化点：暂存所有变动（包含新抓的 m3u，以及刚更新的 index.html 和 snapshot.json）
+          git add -A
           
-          # 2. 检查是否有变动需要提交
           if git diff --staged --quiet; then
-            echo "✅ 没有发现新抓取到的酒店源变动，跳过提交"
+            echo "✅ 没有发现任何变动，跳过提交"
           else
-            git commit -m "📊 覆盖更新：Hotel IPTV 列表 $(date +'%Y-%m-%d %H:%M') [skip ci]"
+            git commit -m "📊 覆盖更新：Hotel IPTV 列表及快照大表 $(date +'%Y-%m-%d %H:%M') [skip ci]"
             
-            # 3. 完美回写私库：强制刷新为本次最新的扫描抓取结果
-            echo "🚀 正在将最新抓取的基因强制推送到私库..."
+            echo "🚀 正在将最新抓取的基因和同步后的网页强制推送到私库..."
             git push origin main --force
           fi
