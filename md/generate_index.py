@@ -1,17 +1,20 @@
 import os
 import json
-import os
 import sys
-# --- 路径配置 ---
-WORKSPACE = os.environ.get("LIVE_WORKSPACE", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-REPO_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
 
-# 最终生成的静态页面与账本
-HOTEL_DIR = os.path.join(WORKSPACE, "hotel")          # 原来可能是 "./hotel"
-REBORN_DIR = os.path.join(WORKSPACE, "hotels")        # 原来可能是 "./hotels"
-OUTPUT_INDEX = os.path.join(WORKSPACE, "index.html")   # 原来可能是 "index.html"
-OUTPUT_JSON = os.path.join(WORKSPACE, "snapshot.json") # 原来可能是 "snapshot.json"
+# ================= ⚡ 跨库核心动态路径锁定 =================
+# 优先读取 GitHub 工作流注入的私库绝对路径，若无则使用本地脚本上级目录
+WORKSPACE = os.environ.get("LIVE_WORKSPACE", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# 核心：将扫描根目录强行锚定为下载下来的私库
+REPO_ROOT = WORKSPACE
+
+# 最终生成的静态页面与账本路径全部锁死在私库中
+HOTEL_DIR = os.path.join(WORKSPACE, "hotel")          
+REBORN_DIR = os.path.join(WORKSPACE, "hotels")        
+OUTPUT_INDEX = os.path.join(WORKSPACE, "index.html")   
+OUTPUT_JSON = os.path.join(WORKSPACE, "snapshot.json") 
+# ==========================================================
 
 def generate_snapshot_and_portal():
     print("📡 [注意模式] 正在全力扫描私库文件结构...")
@@ -312,7 +315,8 @@ def generate_snapshot_and_portal():
 """
 
     try:
-        with open(OUTPUT_HTML, "w", encoding="utf-8") as f_html:
+        # 🎯 核心修正点：将未定义的 OUTPUT_HTML 纠正为上方配置好的 OUTPUT_INDEX
+        with open(OUTPUT_INDEX, "w", encoding="utf-8") as f_html:
             f_html.write(html_content)
         print("🌐 完美控制台静态页面已同步成功写入到私库根目录 index.html ！")
     except Exception as e:
