@@ -3,6 +3,7 @@ import re
 import asyncio
 import httpx
 import shutil
+import sys
 
 # --- 配置区 ---
 SOURCES = [
@@ -14,7 +15,14 @@ SOURCES = [
     "https://yuxx.de5.net/cd8781ee.m3u",
     "https://yuxx.de5.net/a4093b67.m3u"
 ]
-SAVE_DIR = "hotel"
+
+# ================= ⚡ 跨库核心动态路径锁定 =================
+# 优先读取 GitHub 工作流注入的私库绝对路径，若无则使用本地脚本上级目录
+WORKSPACE = os.environ.get("LIVE_WORKSPACE", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+SAVE_DIR = os.path.join(WORKSPACE, "hotel") # 精准将提取出来的原始基因文件平铺在私库下的 hotel 文件夹
+# ==========================================================
+
 IP_API = "http://ip-api.com/json/{}?fields=status,regionName,city,query&lang=zh-CN"
 
 async def get_location(client, ip):
@@ -31,8 +39,9 @@ async def get_location(client, ip):
     return "未知"
 
 async def process_sources():
-    if os.path.exists(SAVE_DIR):
-        shutil.rmtree(SAVE_DIR)
+    print(f"📂 目标数据输出防区锁定为: {SAVE_DIR}")
+    
+    # 注意：此处不再在脚本中物理抹除 SAVE_DIR，改由 GitHub Actions 的备份机制来控制增量
     os.makedirs(SAVE_DIR, exist_ok=True)
 
     headers = {"User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) Chrome/120.0.0.0"}
@@ -78,7 +87,6 @@ async def process_sources():
         print(f"📊 提取到 {len(hotel_data)} 个独立酒店 IP，开始查询归属地并生成文件...", flush=True)
 
         # 2. 并发查询归属地并写入文件
-        # 为了防止被 API 封禁，这里依然使用批处理
         hosts = list(hotel_data.keys())
         batch_size = 5
         for i in range(0, len(hosts), batch_size):
