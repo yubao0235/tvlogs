@@ -1,8 +1,8 @@
-name: Hotel IPTV Daily Refresh
+name: Hotel IPTV Daily Refresh (Sanitizer)
 
 on:
   schedule:
-    - cron: '20 */4 * * *'  # 严格的 5 位格式
+    - cron: '20 */4 * * *'  # 每 4 小时全自动洗版测速一次
   workflow_dispatch:       
 
 concurrency:
@@ -14,80 +14,105 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Private Repo
+      # 1️⃣ 检出公开库（仅仅用来作为算力节点和执行容器）
+      - name: Checkout Public Repo (As Runner Context)
+        uses: actions/checkout@v4
+
+      # 2️⃣ 跨库检出私库，并强制将其下载到专用的临时防区 `private_repo` 下
+      - name: Checkout Private Data Repo
         uses: actions/checkout@v4
         with:
           repository: ${{ secrets.LIVE_REPO }}
           token: ${{ secrets.LIVE_TOKEN }}  
           fetch-depth: 0
+          path: private_repo  # 🎯 核心隔离点：将私库完全装进这个子文件夹里
           persist-credentials: true         
 
-      - name: Setup Python
+      - name: Setup Python Environment
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      - name: Install Dependencies
+      - name: Install Compute Dependencies
         run: |
           python -m pip install --upgrade pip
           python -m pip install requests tqdm urllib3 aiohttp
 
-      # 🎯 【安全护甲 1】运行前强行备份大表成品库 hotels 目录
-      - name: Backup Current Finished Assets
+      # 3️⃣ 【安全护甲】在运行前，备份私库中原有的成品大表，防止被脚本的 rmtree 物理抹除
+      - name: Create Private Repo Finished Assets Backup
         run: |
-          if [ -d "hotels" ]; then
-            cp -r hotels hotels_backup
-            echo "✅ 成功为洗版成品资产库建立安全防区"
+          if [ -d "private_repo/hotels" ]; then
+            cp -r private_repo/hotels private_repo/hotels_backup
+            echo "✅ 成功为私库的成品资产建立了全隔离安全防区"
           fi
 
-      - name: Real-time Execution Scan
+      # 4️⃣ 运行爆破扫描：注入环境变量，让公开库的脚本去扫私库的文件，写私库的文本
+      - name: Run Real-time Execution Scan
         env:
           PYTHONUNBUFFERED: "1"
+          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo # 🎯 强行将脚本的工作路径锚定在私库里
         run: |
           python md/scan_hotel.py
 
+      # 5️⃣ 运行清洗重组
       - name: Rebuild M3U Lists
+        env:
+          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo
         run: |
           python md/rebuild_m3u.py
 
+      # 6️⃣ 运行多线程流媒体测速
       - name: IPTV Speed Test
+        env:
+          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo
         run: |
           if [ -f "md/traffic_test.py" ]; then
             python md/traffic_test.py
           else
-            echo "⚠️ 找不到测速脚本"
+            echo "⚠️ 找不到测速脚本，跳过此步"
           fi
 
-      # 🎯 【安全护甲 2】脚本与测速跑完后，利用 cp -n 完美借尸还魂，确保没发生更新的历史源百分之百存活
+      # 7️⃣ 【安全护甲还原】补回未参与本次清洗的历史成品资源，达成只增不减增量覆盖
       - name: Restore Non-Updated Finished Assets
         run: |
-          if [ -d "hotels_backup" ]; then
-            echo "🔄 正在比对并强制补回未参与本次洗版的历史成品资产..."
-            cp -n hotels_backup/* hotels/ 2>/dev/null || true
-            rm -rf hotels_backup
+          if [ -d "private_repo/hotels_backup" ]; then
+            echo "🔄 正在跨目录比对，强制补回未参与本次洗版的历史成品资产..."
+            cp -n private_repo/hotels_backup/* private_repo/hotels/ 2>/dev/null || true
+            rm -rf private_repo/hotels_backup
           fi
 
+      # 8️⃣ 运行大表索引前端生成
       - name: Generate Web Index
+        env:
+          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo
         run: |
-          python md/generate_index.py
+          if [ -f "md/generate_index.py" ]; then
+            python md/generate_index.py
+          else
+            echo "ℹ️ 如果有 generate_index.py，请确保其也适配了 LIVE_WORKSPACE 变量"
+          fi
 
-      - name: Commit and Push to Private Repo
+      # 9️⃣ 跨库精准推流：进入 private_repo 目录，把洗版成果安全的推回私库
+      - name: Commit and Push Changes Directly to Private Repo
         run: |
-          git config --global user.name "github-actions[bot]"
-          git config --global user.email "github-actions[bot]@users.noreply.github.com"
+          # 切换进私库的工作目录
+          cd private_repo
           
-          # 🎯 【安全护甲 3】只精准锁定可能更新的文件与最终大表，不给 Git 任何机会去同步删除动作
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          
+          # 精准追踪私库需要更新的内容，完全拒绝同步任何物理删除行为
           git add hotels/*.m3u md/traffic_report.txt md/traffic_summary.json index.html snapshot.json
           
           if git diff --staged --quiet; then
-            echo "✅ 没有发现变动，跳过提交"
+            echo "✅ 私库数据文件没有发生任何变动，安全跳过推送。"
             exit 0
           fi
 
-          git commit -m "📊 IPTV Web Portal & Lists Auto Update: $(date +'%Y-%m-%d %H:%M') [skip ci]"
+          git commit -m "📊 [公开库托管运行] IPTV 成品大表及测速报告自动覆写: $(date +'%Y-%m-%d %H:%M') [skip ci]"
 
-          echo "🔄 正在同步远程私库并处理冲突..."
+          echo "🔄 正在同步远程私库并安全变基..."
           git pull --rebase -X ours origin main
 
-          echo "🚀 正在将最新网页和列表推送到私库..."
+          echo "🚀 正在将计算成果安全推送到私库..."
           git push origin main
