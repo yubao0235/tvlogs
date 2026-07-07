@@ -3,6 +3,7 @@ import json
 import os
 import sys
 # --- 路径配置 ---
+WORKSPACE = os.environ.get("LIVE_WORKSPACE", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
 REPO_ROOT = os.path.abspath(os.path.join(CURRENT_DIR, ".."))
 
