@@ -50,7 +50,7 @@ jobs:
       - name: Run Real-time Execution Scan
         env:
           PYTHONUNBUFFERED: "1"
-          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo # 🎯 强行将脚本的工作路径锚定在私库里
+          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo # 🎯 核心注入点
         run: |
           python md/scan_hotel.py
 
