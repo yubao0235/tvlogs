@@ -1,4 +1,4 @@
-name: Hotel IPTV Auto Gather
+name: Hotel IPTV Auto Gather (Runner Mode)
 
 on:
   schedule:
@@ -14,12 +14,18 @@ jobs:
     runs-on: ubuntu-latest
     
     steps:
-      - name: Checkout Private Repo
+      # 1️⃣ 检出公开库（仅仅用来提供算力和 md/ 下的运行脚本）
+      - name: Checkout Public Repo
+        uses: actions/checkout@v4
+
+      # 2️⃣ 跨库检出私库到专门的临时隔离路径 `private_repo` 下
+      - name: Checkout Private Data Repo
         uses: actions/checkout@v4
         with:
           repository: ${{ secrets.LIVE_REPO }}
           token: ${{ secrets.LIVE_TOKEN }}  
           fetch-depth: 0
+          path: private_repo # 🎯 隔离区：保护你的私有文件不泄露到公开库
           persist-credentials: true         
 
       - name: Set up Python
@@ -32,51 +38,64 @@ jobs:
           python -m pip install --upgrade pip
           pip install httpx
 
-      # 🎯 【安全机制 1】在运行抓取前，先备份当前的 hotel 目录，防止被 Python 脚本物理清空
-      - name: Backup Current Assets
+      # 3️⃣ 【安全机制 1】运行前，先备份私库中的原有 hotel 种子目录，防止被冲掉
+      - name: Backup Current Private Assets
         run: |
-          if [ -d "hotel" ]; then
-            cp -r hotel hotel_backup
-            echo "✅ 成功为现有资产建立安全防区"
+          if [ -d "private_repo/hotel" ]; then
+            cp -r private_repo/hotel private_repo/hotel_backup
+            echo "✅ 成功为私库现有原始基因资产建立安全防区"
           fi
 
+      # 4️⃣ 运行公开库下的抓取脚本：注入 LIVE_WORKSPACE 强行接管私库路径
       - name: Run Hotel Gather Script
         env:
           PYTHONUNBUFFERED: "1"  
+          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo # 🎯 核心锚定点
         run: |
-          echo "🚀 开始执行酒店源自动化抓取与归属地解析..."
-          python ./md/hotel_gather.py
+          echo "🚀 开始由公开库代工执行酒店源自动化抓取与归属地解析..."
+          python md/hotel_gather.py
 
-      # 🎯 【安全机制 2】脚本跑完后，把备份里有、但被脚本不小心删掉的历史老文件全部还原回来！
-      - name: Restore Non-Updated Assets
+      # 5️⃣ 【安全机制 2】脚本跑完后，利用 cp -n 把备份里的老基因文件安全还魂
+      - name: Restore Non-Updated Assets to Private Repo
         run: |
-          if [ -d "hotel_backup" ]; then
+          if [ -d "private_repo/hotel_backup" ]; then
             echo "🔄 正在比对并强制补回非更新的历史资产..."
-            cp -n hotel_backup/* hotel/ 2>/dev/null || true
-            rm -rf hotel_backup
+            cp -n private_repo/hotel_backup/* private_repo/hotel/ 2>/dev/null || true
+            rm -rf private_repo/hotel_backup
           fi
 
+      # 6️⃣ 联动生成网页大表
       - name: Generate Web Index
+        env:
+          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo
         run: |
-          echo "🌐 [联动] 正在同步更新前端静态大表..."
-          python ./md/generate_index.py
+          if [ -f "md/generate_index.py" ]; then
+            echo "🌐 [联动] 正在同步更新前端静态大表..."
+            python md/generate_index.py
+          else
+            echo "ℹ️ 如果有 generate_index.py，请确保公开库里存在该脚本"
+          fi
 
+      # 7️⃣ 精准推送回私库
       - name: Commit and Push Changes to Private Repo
         run: |
+          # 必须先切入私库子目录
+          cd private_repo
+          
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # 🎯 【安全机制 3】精准锁定追加，拒绝同步任何删除动作
+          # 🎯 【安全机制 3】精准追踪新增和修改，不接受物理删除同步
           git add hotel/*.m3u index.html snapshot.json
           
           if git diff --staged --quiet; then
-            echo "✅ 没有发现任何新内容变动，跳过提交"
+            echo "✅ 私库数据对比没有发现任何新变化，安全跳过提交。"
           else
-            git commit -m "📊 增量覆盖更新：Hotel IPTV 列表及快照大表 $(date +'%Y-%m-%d %H:%M') [skip ci]"
+            git commit -m "📊 增量覆盖更新：[公开库代工] Hotel IPTV 列表及快照大表 $(date +'%Y-%m-%d %H:%M') [skip ci]"
             
-            echo "🔄 正在同步远程私库并处理潜在冲突..."
+            echo "🔄 正在拉取远程私库最新状态并安全变基..."
             git pull --rebase -X ours origin main
             
-            echo "🚀 正在将最新结果安全推送到私库..."
+            echo "🚀 正在将抓取成果安全同步至私库中..."
             git push origin main
           fi
