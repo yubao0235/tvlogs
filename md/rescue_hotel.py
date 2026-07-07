@@ -1,69 +1,52 @@
-import os, requests, re, concurrent.futures
-from urllib.parse import urlparse
+import os, shutil, re
 
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-INPUT_DEAD = os.path.join(CURRENT_DIR, "dead_tasks.txt")
-OUTPUT_RESCUED = os.path.join(CURRENT_DIR, "rescued_temp.txt")
+# ================= ⚡ 跨库核心动态路径锁定 =================
+WORKSPACE = os.environ.get("LIVE_WORKSPACE", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-TIMEOUT = 4 
-MAX_WORKERS = 60
+HOTEL_OUTPUT = os.path.join(WORKSPACE, "hotel_output.txt")
+REBORN_DIR = os.path.join(WORKSPACE, "hotels") # 精准洗版到私库的 hotels/ 文件夹
+# ==========================================================
 
-def check_url(url):
-    try:
-        r = requests.get(url, timeout=TIMEOUT, stream=True)
-        return r.status_code == 200
-    except: return False
+LOGO_BASE_URL = "https://tb.yubo.qzz.io/logo/"
 
-def main():
-    if not os.path.exists(INPUT_DEAD) or os.path.getsize(INPUT_DEAD) == 0:
-        print("🚑 没有待抢救的任务。", flush=True)
+def clean_channel_name(name):
+    name = re.sub(r'(高清|标清|普清|超清|超高清|H\.265|4K|HD|SD|hd|sd)', '', name, flags=re.I)
+    name = re.sub(r'[\(\)\[\]\-\s]+', '', name)
+    return name.strip()
+
+def rebuild():
+    if not os.path.exists(HOTEL_OUTPUT):
+        print(f"⚠️ 找不到扫描账本 {HOTEL_OUTPUT}，跳过洗版。")
         return
-
-    with open(INPUT_DEAD, 'r', encoding='utf-8') as f:
-        blocks = [b.strip() for b in f.read().split('\n\n') if b.strip()]
-
-    rescued_blocks = []
-    for idx, block in enumerate(blocks):
-        lines = block.split('\n')
-        old_ip = lines[0].split(',')[0].strip()
         
-        # --- 修复逻辑：必须包含冒号且符合 IP 结构 ---
-        if ':' not in old_ip or not re.match(r'^\d', old_ip):
-            print(f"[{idx+1}/{len(blocks)}] ⚠️ 跳过非 IP 格式: {old_ip}", flush=True)
-            continue
+    if os.path.exists(REBORN_DIR): shutil.rmtree(REBORN_DIR)
+    os.makedirs(REBORN_DIR, exist_ok=True)
 
-        print(f"[{idx+1}/{len(blocks)}] 🔎 爆破抢救: {old_ip}", flush=True)
+    with open(HOTEL_OUTPUT, "r", encoding="utf-8") as f:
+        content = f.read().strip().split("\n\n")
+
+    all_m3u = ["#EXTM3U"]
+    for section in content:
+        lines = section.strip().split("\n")
+        if not lines: continue
+        host = lines[0].split(",")[0]
+        safe_host = host.replace('.', '_').replace(':', '_')
         
-        try:
-            ip_part, port = old_ip.split(':')
-            prefix = ".".join(ip_part.split('.')[:3])
-            path = urlparse(lines[1].split(',')[1]).path
-            
-            tasks = [f"http://{prefix}.{i}:{port}{path}" for i in range(1, 256)]
-            new_host = None
-            
-            with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as exe:
-                fut_to_url = {exe.submit(check_url, u): u for u in tasks}
-                for fut in concurrent.futures.as_completed(fut_to_url):
-                    if fut.result():
-                        new_host = urlparse(fut_to_url[fut]).netloc
-                        break
-            
-            if new_host:
-                print(f"  ✨ 成功: {new_host}", flush=True)
-                res = f"{new_host},#genre#\n"
-                for l in lines[1:]:
-                    if ',' in l:
-                        name, url = l.split(',', 1)
-                        res += f"{name},http://{new_host}{urlparse(url).path}\n"
-                rescued_blocks.append(res + "\n\n")
-            else:
-                print("  ❌ 失败", flush=True)
-        except Exception as e:
-            print(f"  ⚠️ 错误: {e}", flush=True)
+        single_m3u = ["#EXTM3U"]
+        for cl in lines[1:]:
+            if "," in cl:
+                name, url = cl.split(",", 1)
+                clean_n = clean_channel_name(name)
+                header = f'#EXTINF:-1 tvg-name="{clean_n}" tvg-logo="{LOGO_BASE_URL}{clean_n}.png" group-title="Hotel_{host}",{clean_n}'
+                single_m3u.extend([header, url])
+                all_m3u.extend([header, url])
+        
+        with open(os.path.join(REBORN_DIR, f"REBORN_{safe_host}.m3u"), "w", encoding="utf-8") as f_out:
+            f_out.write("\n".join(single_m3u))
 
-    with open(OUTPUT_RESCUED, 'w', encoding='utf-8') as f:
-        f.writelines(rescued_blocks)
+    with open(os.path.join(REBORN_DIR, "ALL.m3u"), "w", encoding="utf-8") as f_all:
+        f_all.write("\n".join(all_m3u))
+    print(f"🌟 洗版完成！成品已平铺至: {REBORN_DIR}")
 
 if __name__ == "__main__":
-    main()
+    rebuild()
