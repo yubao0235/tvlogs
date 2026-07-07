@@ -1,13 +1,18 @@
 import os, re, requests, concurrent.futures
+import sys
 from urllib.parse import urlparse
 
-# ================= 配置区 =================
-HOTEL_DIR = "./hotel"
-RESULT_TXT = "hotel_output.txt" 
+# ================= ⚡ 跨库核心动态路径锁定 =================
+# 优先读取 GitHub 工作流注入的私库绝对路径，若无则使用本地脚本上级目录
+WORKSPACE = os.environ.get("LIVE_WORKSPACE", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+HOTEL_DIR = os.path.join(WORKSPACE, "hotel")          # 精准指向私库下的 hotel 文件夹
+RESULT_TXT = os.path.join(WORKSPACE, "hotel_output.txt") # 扫描临时大表存放在私库根目录
+# ==========================================================
+
 TIMEOUT = 3 
-MAX_WORKERS = 150 # 爆破时线程数建议保持在高位
+MAX_WORKERS = 150 
 HEADERS = {"User-Agent": "Lavf/58.29.100"}
-# ==========================================
 
 def check_url(url):
     try:
@@ -30,7 +35,6 @@ def extract_from_m3u(file_path):
     return {"host": host, "channels": channels}
 
 def save_realtime(host, channels, tag=""):
-    """实时写入并打印"""
     with open(RESULT_TXT, "a", encoding="utf-8") as f:
         f.write(f"{host},#genre#\n")
         for c in channels:
@@ -41,7 +45,11 @@ def save_realtime(host, channels, tag=""):
 def run_scan():
     if os.path.exists(RESULT_TXT): os.remove(RESULT_TXT)
     
-    print("📂 正在聚合原始基因...")
+    print(f"📂 正在聚合原始基因，目标防区: {HOTEL_DIR}")
+    if not os.path.exists(HOTEL_DIR):
+        print(f"❌ 致命错误: 找不到原始种子目录 {HOTEL_DIR}")
+        sys.exit(1)
+
     all_genes = {}
     m3u_files = [f for f in os.listdir(HOTEL_DIR) if f.lower().endswith(".m3u")]
     for f in m3u_files:
@@ -51,7 +59,6 @@ def run_scan():
     final_live_hosts = set()
     failed_genes = {}
 
-    # --- 阶段 1: 快速检测 ---
     print(f"⚡ 阶段 1: 快速检测 {len(all_genes)} 个原始 IP...")
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         future_to_host = {executor.submit(check_url, f"http://{h}{c[0]['path']}"): (h, c) for h, c in all_genes.items()}
@@ -63,18 +70,15 @@ def run_scan():
             else:
                 failed_genes[host] = channels
 
-    # --- 阶段 2: C 段爆破 ---
     print(f"\n📡 阶段 2: 启动 C 段深度扫描 (剩余 {len(failed_genes)} 个待处理网段)...")
     processed_nets = set()
     
     for host, channels in failed_genes.items():
-        # 提取网段
         ip_parts = host.split(':')[0].split('.')
         if len(ip_parts) < 4: continue
         prefix = ".".join(ip_parts[:3])
         port = host.split(':')[1] if ':' in host else "80"
         
-        # 策略：如果该网段已经有活着的 IP 了，或者已经扫过了，就跳过
         if prefix in processed_nets: continue
         if any(h.startswith(prefix) for h in final_live_hosts): continue
         
@@ -84,7 +88,6 @@ def run_scan():
         scan_urls = [f"http://{prefix}.{i}:{port}{channels[0]['path']}" for i in range(1, 255)]
         
         with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-            # 同样使用 as_completed 保证爆破时也是出一个弹一个
             future_to_url = {executor.submit(check_url, url): url for url in scan_urls}
             for future in concurrent.futures.as_completed(future_to_url):
                 res_url = future.result()
@@ -94,7 +97,7 @@ def run_scan():
                         save_realtime(new_host, channels, tag="复活")
                         final_live_hosts.add(new_host)
 
-    print("\n✅ 深度扫描结束！")
+    print(f"\n✅ 深度扫描结束！结果已写入: {RESULT_TXT}")
 
 if __name__ == "__main__":
     run_scan()
