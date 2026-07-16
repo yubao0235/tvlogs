@@ -129,7 +129,7 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 精准追踪私库需要更新的内容
+          # 6. 精准追踪私库需要更新的内容
           git add hotels/*.m3u md/traffic_report.txt md/traffic_summary.json index.html snapshot.json 2>/dev/null || true
           
           if git diff --staged --quiet; then
@@ -137,8 +137,15 @@ jobs:
             exit 0
           fi
 
+          # 7. 提交我们需要保留的核心计算产物
           git commit -m "📊 [公开库托管运行] IPTV 成品大表及测速报告自动覆写: $(date +'%Y-%m-%d %H:%M') [skip ci]"
 
+          # 🌟 核心改进：彻底清除工作区残留的、未提交的其他临时废弃文件，保证绝对干净
+          echo "🧹 正在清理未跟踪的残留临时垃圾文件，为变基扫清障碍..."
+          git checkout -- .
+          git clean -df || true
+
+          # 8. 同步与安全变基推送
           echo "🔄 正在同步远程私库并安全变基..."
           git pull --rebase -X ours origin main
 
