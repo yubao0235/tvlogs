@@ -92,20 +92,48 @@ jobs:
             echo "ℹ️ 如果有 generate_index.py，请确保其也适配了 LIVE_WORKSPACE 变量"
           fi
 
-      # 9️⃣ 跨库精准推流：进入 private_repo 目录，把洗版成果安全的推回私库
+      # 9️⃣ 跨库精准推流：强行同步公开库计算产物，进入 private_repo 目录，把洗版成果安全的推回私库
       - name: Commit and Push Changes Directly to Private Repo
         run: |
-          # 切换进私库的工作目录
+          echo "🔄 正在强行从公开工作区搬运最新计算产物到私库防区..."
+          
+          # 1. 确保私库的 target 文件夹存在
+          mkdir -p private_repo/hotels
+          mkdir -p private_repo/md
+          
+          # 2. 强行拷贝公开库计算出来的最新 M3U 成品大表
+          if [ -d "hotels" ]; then
+            cp -r hotels/* private_repo/hotels/ || true
+          fi
+          
+          # 3. 强行拷贝最新生成的流量报告和 JSON 账本
+          if [ -f "md/traffic_report.txt" ]; then
+            cp md/traffic_report.txt private_repo/md/traffic_report.txt || true
+          fi
+          if [ -f "md/traffic_summary.json" ]; then
+            cp md/traffic_summary.json private_repo/md/traffic_summary.json || true
+          fi
+          
+          # 4. 强行拷贝根目录可能生成的 index.html 和 snapshot.json
+          if [ -f "index.html" ]; then
+            cp index.html private_repo/index.html || true
+          fi
+          if [ -f "snapshot.json" ]; then
+            cp snapshot.json private_repo/snapshot.json || true
+          fi
+          
+          # ===================================================
+          # 5. 切换进私库的工作目录准备 Git 追踪
           cd private_repo
           
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 精准追踪私库需要更新的内容，完全拒绝同步任何物理删除行为
-          git add hotels/*.m3u md/traffic_report.txt md/traffic_summary.json index.html snapshot.json
+          # 精准追踪私库需要更新的内容
+          git add hotels/*.m3u md/traffic_report.txt md/traffic_summary.json index.html snapshot.json 2>/dev/null || true
           
           if git diff --staged --quiet; then
-            echo "✅ 私库数据文件没有发生任何变动，安全跳过推送。"
+            echo "✅ 强行比对后发现私库数据文件依然无实质变动，安全跳过推送。"
             exit 0
           fi
 
