@@ -160,7 +160,11 @@ def main():
         del data["speeds"]
 
     save_reports(results, group_summary)
-    print(f"✅ 测速报告已成功输出至私库 md/ 目录！")
+print(f"🚀 启动流媒体全自动测速引擎...", flush=True)
+print(f"📂 正在读取成品大表: {SOURCE_M3U}", flush=True)
+print(f"❌ 错误: 找不到源文件 {SOURCE_M3U}，测速被迫中断。", flush=True)
+print(f"📡 识别到 {len(groups)} 个有效网段，随机抽取 {len(tasks)} 个流样本进行压测...", flush=True)
+print(f"✅ 测速报告已成功输出至私库 md/ 目录！", flush=True)
 
 if __name__ == "__main__":
     main()
