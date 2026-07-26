@@ -10,6 +10,10 @@ WORKSPACE = os.environ.get("LIVE_WORKSPACE", os.path.dirname(os.path.dirname(os.
 
 HOTEL_DIR = os.path.join(WORKSPACE, "hotel")          # 指向私库下的 hotel 文件夹
 RESULT_TXT = os.path.join(WORKSPACE, "hotel_output.txt") # 扫描临时大表存放在私库根目录
+
+# 🎯 新增：失效死机源输出路径（存放在 md/ 文件夹下）
+MD_DIR = os.path.join(WORKSPACE, "md")
+DEAD_TXT = os.path.join(MD_DIR, "dead_hosts.txt")
 # ==========================================================
 
 TIMEOUT = 3 
@@ -79,6 +83,9 @@ def run_scan():
     print(f"\n📡 阶段 2: 启动 C 段深度扫描 (剩余 {len(failed_genes)} 个待处理网段)...")
     processed_nets = set()
     
+    # 记录在 C 段扫描中依然没有复活成功的“纯死机源网段”
+    completely_dead_hosts = []
+
     for host, channels in failed_genes.items():
         ip_parts = host.split(':')[0].split('.')
         if len(ip_parts) < 4:
@@ -89,6 +96,7 @@ def run_scan():
         if prefix in processed_nets:
             continue
         if any(h.startswith(prefix) for h in final_live_hosts):
+            # 如果同 C 段被其他活源救活了，就不算彻底死掉
             continue
         
         processed_nets.add(prefix)
@@ -96,6 +104,7 @@ def run_scan():
         
         scan_urls = [f"http://{prefix}.{i}:{port}{channels[0]['path']}" for i in range(1, 255)]
         
+        net_rescued = False
         with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
             future_to_url = {executor.submit(check_url, url): url for url in scan_urls}
             for future in concurrent.futures.as_completed(future_to_url):
@@ -105,8 +114,25 @@ def run_scan():
                     if new_host not in final_live_hosts:
                         save_realtime(new_host, channels, tag="复活")
                         final_live_hosts.add(new_host)
+                        net_rescued = True
 
+        # 如果整个 C 段扫完都没有找到任何可用 IP，判定为彻底失效源
+        if not net_rescued:
+            completely_dead_hosts.append(host)
+
+    # 🎯 新增：将未探测出新源、彻底失效的 IP 列表写入私库的 md/dead_hosts.txt
+    os.makedirs(MD_DIR, exist_ok=True)
+    with open(DEAD_TXT, "w", encoding="utf-8") as f_dead:
+        f_dead.write("# ==========================================\n")
+        f_dead.write(# 写入简单的说明
+            f"# ❌ 失效/未复活的酒店IP源汇总\n"
+        )
+        f_dead.write("# ==========================================\n")
+        for dead_host in sorted(completely_dead_hosts):
+            f_dead.write(f"{dead_host}\n")
+            
     print(f"\n✅ 深度扫描结束！结果已写入: {RESULT_TXT}")
+    print(f"🗑️ 已失效未复活的源 IP 列表已同步写入: {DEAD_TXT}")
 
 if __name__ == "__main__":
     run_scan()
