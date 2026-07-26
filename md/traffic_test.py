@@ -8,18 +8,21 @@ import urllib3
 from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor
 
+# 禁用 urllib3 的 InsecureRequestWarning 警告
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
+
 workspace = os.environ.get('LIVE_WORKSPACE', '.')
 
-# 调整所有相关文件的读取和保存路径
-m3u_path = os.path.join(workspace, "hotels/ALL.m3u")  # 或者你实际存放总表的路径
-summary_json_path = os.path.join(workspace, "md/traffic_summary.json")
-report_txt_path = os.path.join(workspace, "md/traffic_report.txt")
+# 🎯 路径对齐：统一使用前面定义好的变量名
+SOURCE_M3U = os.path.join(workspace, "hotels/ALL.m3u")
+OUTPUT_JSON = os.path.join(workspace, "md/traffic_summary.json")
+OUTPUT_TXT = os.path.join(workspace, "md/traffic_report.txt")
 dead_hosts_path = os.path.join(workspace, "md/dead_hosts.txt")
 
 # 确保目标输出目录存在
-os.makedirs(os.path.dirname(summary_json_path), exist_ok=True)
+os.makedirs(os.path.dirname(OUTPUT_JSON), exist_ok=True)
 
-TEST_DURATION = 8   
+TEST_DURATION = 8    
 SAMPLES_PER_IP = 2  
 MAX_WORKERS = 8     
 
