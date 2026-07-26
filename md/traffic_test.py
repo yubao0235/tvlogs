@@ -104,11 +104,11 @@ def save_reports(results, group_summary):
         json.dump({"summary": group_summary, "details": results}, f, ensure_ascii=False, indent=2)
 
 def main():
-    print(f"🚀 启动流媒体全自动测速引擎...")
-    print(f"📂 正在读取成品大表: {SOURCE_M3U}")
+    print(f"🚀 启动流媒体全自动测速引擎...", flush=True)
+    print(f"📂 正在读取成品大表: {SOURCE_M3U}", flush=True)
     
     if not os.path.exists(SOURCE_M3U):
-        print(f"❌ 错误: 找不到源文件 {SOURCE_M3U}，测速被迫中断。")
+        print(f"❌ 错误: 找不到源文件 {SOURCE_M3U}，测速被迫中断。", flush=True)
         return
 
     with open(SOURCE_M3U, 'r', encoding='utf-8', errors='ignore') as f:
@@ -132,7 +132,7 @@ def main():
         samples = random.sample(urls, min(len(urls), SAMPLES_PER_IP))
         tasks.extend(samples)
 
-    print(f"📡 识别到 {len(groups)} 个有效网段，随机抽取 {len(tasks)} 个流样本进行压测...")
+    print(f"📡 识别到 {len(groups)} 个有效网段，随机抽取 {len(tasks)} 个流样本进行压测...", flush=True)
 
     results = []
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -160,11 +160,7 @@ def main():
         del data["speeds"]
 
     save_reports(results, group_summary)
-print(f"🚀 启动流媒体全自动测速引擎...", flush=True)
-print(f"📂 正在读取成品大表: {SOURCE_M3U}", flush=True)
-print(f"❌ 错误: 找不到源文件 {SOURCE_M3U}，测速被迫中断。", flush=True)
-print(f"📡 识别到 {len(groups)} 个有效网段，随机抽取 {len(tasks)} 个流样本进行压测...", flush=True)
-print(f"✅ 测速报告已成功输出至私库 md/ 目录！", flush=True)
+    print(f"✅ 测速报告已成功输出至私库 md/ 目录！", flush=True)
 
 if __name__ == "__main__":
     main()
