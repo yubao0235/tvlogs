@@ -66,14 +66,13 @@ jobs:
       - name: IPTV Speed Test
         env:
           PYTHONUNBUFFERED: "1"
-          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo
+          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo  # 🎯 关键：把私库路径传进去
         run: |
           if [ -f "md/traffic_test.py" ]; then
             python md/traffic_test.py
           else
             echo "⚠️ 找不到测速脚本，跳过此步"
           fi
-
       # 7️⃣ 【安全护甲还原】补回未参与本次清洗的历史成品资源
       - name: Restore Non-Updated Finished Assets
         run: |
