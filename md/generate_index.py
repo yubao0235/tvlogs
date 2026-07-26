@@ -33,11 +33,10 @@ def generate_snapshot_and_portal():
         
         for file in files:
             if file.endswith(ALLOWED_EXTENSIONS):
-                # 如果这个文件碰巧是即将生成的 index.html 本身或账本，不要塞入列表
-                if file in ['index.html', 'snapshot.json']:
+                # 允许 snapshot.json 参与索引，或者只过滤 index.html
+                if file == 'index.html':
                     continue
                 
-                # 计算出相对于私库根目录的干净路径 (例如: "hotels/ALL.m3u", "md/traffic_report.txt")
                 full_path = os.path.join(root, file)
                 relative_path = os.path.relpath(full_path, REPO_ROOT).replace('\\', '/')
                 valid_files.append(relative_path)
