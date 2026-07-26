@@ -124,8 +124,14 @@ def run_scan():
         for dead_host in sorted(completely_dead_hosts):
             f_dead.write(f"{dead_host}\n")
             
-    print(f"\n✅ 深度扫描结束！结果已写入: {RESULT_TXT}")
-    print(f"🗑️ 已失效未复活的源 IP 列表已同步写入: {DEAD_TXT}")
+print(f"✨ [{tag}] 已上线: {host}", flush=True)
+print(f"📂 正在聚合原始基因，目标防区: {HOTEL_DIR}", flush=True)
+print(f"❌ 致命错误: 找不到原始种子目录 {HOTEL_DIR}", flush=True)
+print(f"⚡ 阶段 1: 快速检测 {len(all_genes)} 个原始 IP...", flush=True)
+print(f"\n📡 阶段 2: 启动 C 段深度扫描 (剩余 {len(failed_genes)} 个待处理网段)...", flush=True)
+print(f"🔍 正在扫荡网段: {prefix}.x:{port}...", flush=True)
+print(f"\n✅ 深度扫描结束！结果已写入: {RESULT_TXT}", flush=True)
+print(f"🗑️ 已失效未复活的源 IP 列表已同步写入: {DEAD_TXT}", flush=True)
 
 if __name__ == "__main__":
     run_scan()
