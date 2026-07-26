@@ -14,6 +14,7 @@ SOURCES = [
     "https://yuxx.de5.net/3c1f32b7.m3u",	
     "https://yuxx.de5.net/97d6e00d.m3u",	
     "https://yuxx.de5.net/cd8781ee.m3u",
+    "https://yuxx.de5.net/e7d58303.m3u",
     "https://yuxx.de5.net/a4093b67.m3u"
 ]
 
