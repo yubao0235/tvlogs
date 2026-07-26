@@ -117,6 +117,7 @@ jobs:
             cp md/dead_hosts.txt private_repo/md/dead_hosts.txt || true
           fi
           
+          # 🎯 【关键核心修复】确保 index.html 和 snapshot.json 强行同步到私库根目录
           if [ -f "index.html" ]; then
             cp index.html private_repo/index.html || true
           fi
@@ -124,11 +125,17 @@ jobs:
             cp snapshot.json private_repo/snapshot.json || true
           fi
           
+          # 如果你的 generate_index.py 是直接在 private_repo 里面生成的，这一步可以确保万无一失
+          if [ -f "private_repo/index.html" ] && [ -f "private_repo/snapshot.json" ]; then
+            echo "✅ 网页资产已在私库防区就位"
+          fi
+          
           cd private_repo
           
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           
+          # 🎯 确保 git add 能够把 snapshot.json 纳进来
           git add hotels/*.m3u md/traffic_report.txt md/traffic_summary.json md/dead_hosts.txt index.html snapshot.json 2>/dev/null || true
           
           if git diff --staged --quiet; then
