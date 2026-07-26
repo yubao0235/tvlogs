@@ -1,7 +1,9 @@
 import os, shutil, re
 
-HOTEL_OUTPUT = "hotel_output.txt"
-REBORN_DIR = "./hotels"
+# 🎯 核心修复：自动适配环境变量，精准定位私库或当前工作区
+WORKSPACE = os.getenv(".", ".")
+HOTEL_OUTPUT = os.path.join(WORKSPACE, "hotel_output.txt")
+REBORN_DIR = os.path.join(WORKSPACE, "hotels")
 LOGO_BASE_URL = "https://tb.yubo.qzz.io/logo/"
 
 def clean_channel_name(name):
@@ -10,8 +12,12 @@ def clean_channel_name(name):
     return name.strip()
 
 def rebuild():
-    if not os.path.exists(HOTEL_OUTPUT): return
-    if os.path.exists(REBORN_DIR): shutil.rmtree(REBORN_DIR)
+    if not os.path.exists(HOTEL_OUTPUT):
+        print(f"⚠️ 找不到输入文件: {HOTEL_OUTPUT}")
+        return
+        
+    if os.path.exists(REBORN_DIR):
+        shutil.rmtree(REBORN_DIR)
     os.makedirs(REBORN_DIR)
 
     with open(HOTEL_OUTPUT, "r", encoding="utf-8") as f:
@@ -38,7 +44,7 @@ def rebuild():
 
     with open(os.path.join(REBORN_DIR, "ALL.m3u"), "w", encoding="utf-8") as f_all:
         f_all.write("\n".join(all_m3u))
-    print(f"🌟 洗版完成！")
+    print(f"🌟 洗版完成！文件已精准写入: {REBORN_DIR}")
 
 if __name__ == "__main__":
     rebuild()
