@@ -82,8 +82,6 @@ def run_scan():
 
     print(f"\n📡 阶段 2: 启动 C 段深度扫描 (剩余 {len(failed_genes)} 个待处理网段)...")
     processed_nets = set()
-    
-    # 记录在 C 段扫描中依然没有复活成功的“纯死机源网段”
     completely_dead_hosts = []
 
     for host, channels in failed_genes.items():
@@ -96,7 +94,6 @@ def run_scan():
         if prefix in processed_nets:
             continue
         if any(h.startswith(prefix) for h in final_live_hosts):
-            # 如果同 C 段被其他活源救活了，就不算彻底死掉
             continue
         
         processed_nets.add(prefix)
@@ -116,17 +113,13 @@ def run_scan():
                         final_live_hosts.add(new_host)
                         net_rescued = True
 
-        # 如果整个 C 段扫完都没有找到任何可用 IP，判定为彻底失效源
         if not net_rescued:
             completely_dead_hosts.append(host)
 
-    # 🎯 新增：将未探测出新源、彻底失效的 IP 列表写入私库的 md/dead_hosts.txt
     os.makedirs(MD_DIR, exist_ok=True)
     with open(DEAD_TXT, "w", encoding="utf-8") as f_dead:
         f_dead.write("# ==========================================\n")
-        f_dead.write(# 写入简单的说明
-            f"# ❌ 失效/未复活的酒店IP源汇总\n"
-        )
+        f_dead.write("# ❌ 失效/未复活的酒店IP源汇总\n")
         f_dead.write("# ==========================================\n")
         for dead_host in sorted(completely_dead_hosts):
             f_dead.write(f"{dead_host}\n")
