@@ -1,11 +1,13 @@
 import os, shutil, re
 
-# 🎯 核心修复：自动适配环境变量，精准定位私库或当前工作区
-WORKSPACE = os.getenv(".", ".")
-HOTEL_OUTPUT = os.path.join(WORKSPACE, "hotel_output.txt")
-REBORN_DIR = os.path.join(WORKSPACE, "hotels")
-LOGO_BASE_URL = "https://tb.yubo.qzz.io/logo/"
+# ================= ⚡ 跨库核心动态路径锁定 =================
+# 必须显式加上 os.environ.get，否则在 GitHub Actions 里会退化成当前公开库目录
+WORKSPACE = os.environ.get("LIVE_WORKSPACE", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
+HOTEL_OUTPUT = os.path.join(WORKSPACE, "hotel_output.txt")
+REBORN_DIR = os.path.join(WORKSPACE, "hotels")  # 🎯 关键：必须指向私库下的 hotels
+LOGO_BASE_URL = "https://tb.yubo.qzz.io/logo/"
+# ==========================================================
 def clean_channel_name(name):
     name = re.sub(r'(高清|标清|普清|超清|超高清|H\.265|4K|HD|SD|hd|sd)', '', name, flags=re.I)
     name = re.sub(r'[\(\)\[\]\-\s]+', '', name)
