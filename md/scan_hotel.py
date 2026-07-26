@@ -1,12 +1,14 @@
-import os, re, requests, concurrent.futures
+import os
+import re
+import requests
+import concurrent.futures
 import sys
 from urllib.parse import urlparse
 
 # ================= ⚡ 跨库核心动态路径锁定 =================
-# 优先读取 GitHub 工作流注入的私库绝对路径，若无则使用本地脚本上级目录
 WORKSPACE = os.environ.get("LIVE_WORKSPACE", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-HOTEL_DIR = os.path.join(WORKSPACE, "hotel")          # 精准指向私库下的 hotel 文件夹
+HOTEL_DIR = os.path.join(WORKSPACE, "hotel")          # 指向私库下的 hotel 文件夹
 RESULT_TXT = os.path.join(WORKSPACE, "hotel_output.txt") # 扫描临时大表存放在私库根目录
 # ==========================================================
 
@@ -18,14 +20,16 @@ def check_url(url):
     try:
         r = requests.get(url.replace('&amp;', '&'), headers=HEADERS, timeout=TIMEOUT, stream=True)
         return url if r.status_code in [200, 206] else None
-    except: return None
+    except:
+        return None
 
 def extract_from_m3u(file_path):
     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
         content = f.read()
     pattern = r'#EXTINF:.*?,(.*?)\n(https?://[^\s,\"\']+)'
     items = re.findall(pattern, content)
-    if not items: return None
+    if not items:
+        return None
     first_url = items[0][1].replace('&amp;', '&')
     host = urlparse(first_url).netloc
     channels = []
@@ -43,7 +47,8 @@ def save_realtime(host, channels, tag=""):
     print(f"✨ [{tag}] 已上线: {host}")
 
 def run_scan():
-    if os.path.exists(RESULT_TXT): os.remove(RESULT_TXT)
+    if os.path.exists(RESULT_TXT):
+        os.remove(RESULT_TXT)
     
     print(f"📂 正在聚合原始基因，目标防区: {HOTEL_DIR}")
     if not os.path.exists(HOTEL_DIR):
@@ -54,7 +59,8 @@ def run_scan():
     m3u_files = [f for f in os.listdir(HOTEL_DIR) if f.lower().endswith(".m3u")]
     for f in m3u_files:
         gene = extract_from_m3u(os.path.join(HOTEL_DIR, f))
-        if gene: all_genes[gene['host']] = gene['channels']
+        if gene:
+            all_genes[gene['host']] = gene['channels']
 
     final_live_hosts = set()
     failed_genes = {}
@@ -75,12 +81,15 @@ def run_scan():
     
     for host, channels in failed_genes.items():
         ip_parts = host.split(':')[0].split('.')
-        if len(ip_parts) < 4: continue
+        if len(ip_parts) < 4:
+            continue
         prefix = ".".join(ip_parts[:3])
         port = host.split(':')[1] if ':' in host else "80"
         
-        if prefix in processed_nets: continue
-        if any(h.startswith(prefix) for h in final_live_hosts): continue
+        if prefix in processed_nets:
+            continue
+        if any(h.startswith(prefix) for h in final_live_hosts):
+            continue
         
         processed_nets.add(prefix)
         print(f"🔍 正在扫荡网段: {prefix}.x:{port}...")
