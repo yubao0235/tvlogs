@@ -2,8 +2,8 @@ name: Hotel IPTV Daily Refresh (Sanitizer)
 
 on:
   schedule:
-    - cron: '20 */4 * * *'  # 每 4 小时全自动洗版测速一次
-  workflow_dispatch:       
+    - cron: '20 */8 * * *'  # 每8 小时全自动洗版测速一次
+  workflow_dispatch:        
 
 concurrency:
   group: ${{ github.workflow }}-${{ github.ref }}
@@ -38,7 +38,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install requests tqdm urllib3 aiohttp
 
-      # 3️⃣ 【安全护甲】在运行前，备份私库中原有的成品大表，防止被脚本的 rmtree 物理抹除
+      # 3️⃣ 【安全护甲】在运行前，备份私库中原有的成品大表，防止被物理抹除
       - name: Create Private Repo Finished Assets Backup
         run: |
           if [ -d "private_repo/hotels" ]; then
@@ -46,17 +46,18 @@ jobs:
             echo "✅ 成功为私库的成品资产建立了全隔离安全防区"
           fi
 
-      # 4️⃣ 运行爆破扫描：注入环境变量，让公开库的脚本去扫私库的文件，写私库的文本
+      # 4️⃣ 运行爆破扫描
       - name: Run Real-time Execution Scan
         env:
           PYTHONUNBUFFERED: "1"
-          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo # 🎯 核心注入点
+          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo
         run: |
           python md/scan_hotel.py
 
       # 5️⃣ 运行清洗重组
       - name: Rebuild M3U Lists
         env:
+          PYTHONUNBUFFERED: "1"
           LIVE_WORKSPACE: ${{ github.workspace }}/private_repo
         run: |
           python md/rebuild_m3u.py
@@ -64,6 +65,7 @@ jobs:
       # 6️⃣ 运行多线程流媒体测速
       - name: IPTV Speed Test
         env:
+          PYTHONUNBUFFERED: "1"
           LIVE_WORKSPACE: ${{ github.workspace }}/private_repo
         run: |
           if [ -f "md/traffic_test.py" ]; then
@@ -72,7 +74,7 @@ jobs:
             echo "⚠️ 找不到测速脚本，跳过此步"
           fi
 
-      # 7️⃣ 【安全护甲还原】补回未参与本次清洗的历史成品资源，达成只增不减增量覆盖
+      # 7️⃣ 【安全护甲还原】补回未参与本次清洗的历史成品资源
       - name: Restore Non-Updated Finished Assets
         run: |
           if [ -d "private_repo/hotels_backup" ]; then
@@ -84,6 +86,7 @@ jobs:
       # 8️⃣ 运行大表索引前端生成
       - name: Generate Web Index
         env:
+          PYTHONUNBUFFERED: "1"
           LIVE_WORKSPACE: ${{ github.workspace }}/private_repo
         run: |
           if [ -f "md/generate_index.py" ]; then
@@ -92,21 +95,18 @@ jobs:
             echo "ℹ️ 如果有 generate_index.py，请确保其也适配了 LIVE_WORKSPACE 变量"
           fi
 
-      # 9️⃣ 跨库精准推流：强行同步公开库计算产物，进入 private_repo 目录，把洗版成果安全的推回私库
+      # 9️⃣ 跨库精准推流：强行同步计算产物到私库
       - name: Commit and Push Changes Directly to Private Repo
         run: |
           echo "🔄 正在强行从公开工作区搬运最新计算产物到私库防区..."
           
-          # 1. 确保私库的目标文件夹存在
           mkdir -p private_repo/hotels
           mkdir -p private_repo/md
           
-          # 2. 强行拷贝公开库计算出来的最新 M3U 成品大表
           if [ -d "hotels" ]; then
             cp -r hotels/* private_repo/hotels/ || true
           fi
           
-          # 3. 强行拷贝最新生成的流量报告、JSON 账本以及新增的 dead_hosts.txt
           if [ -f "md/traffic_report.txt" ]; then
             cp md/traffic_report.txt private_repo/md/traffic_report.txt || true
           fi
@@ -117,7 +117,6 @@ jobs:
             cp md/dead_hosts.txt private_repo/md/dead_hosts.txt || true
           fi
           
-          # 4. 强行拷贝根目录可能生成的 index.html 和 snapshot.json
           if [ -f "index.html" ]; then
             cp index.html private_repo/index.html || true
           fi
@@ -125,14 +124,11 @@ jobs:
             cp snapshot.json private_repo/snapshot.json || true
           fi
           
-          # ===================================================
-          # 5. 切换进私库的工作目录准备 Git 追踪
           cd private_repo
           
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 6. 精准追踪私库需要更新的内容（⭐️ 已加入 md/dead_hosts.txt）
           git add hotels/*.m3u md/traffic_report.txt md/traffic_summary.json md/dead_hosts.txt index.html snapshot.json 2>/dev/null || true
           
           if git diff --staged --quiet; then
@@ -140,15 +136,12 @@ jobs:
             exit 0
           fi
 
-          # 7. 提交我们需要保留的核心计算产物
           git commit -m "📊 [公开库托管运行] IPTV 成品大表、测速及失效源日志自动覆写: $(date +'%Y-%m-%d %H:%M') [skip ci]"
 
-          # 🌟 清理残留临时垃圾文件，为变基扫清障碍
-          echo "🧹 正在清理未跟踪的残留临时垃圾文件，为变基扫清障碍..."
+          echo "🧹 正在清理未跟踪的残留临时垃圾文件..."
           git checkout -- .
           git clean -df || true
 
-          # 8. 同步与安全变基推送
           echo "🔄 正在同步远程私库并安全变基..."
           git pull --rebase -X ours origin main
 
