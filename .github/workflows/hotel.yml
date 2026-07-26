@@ -78,7 +78,7 @@ jobs:
             echo "ℹ️ 如果有 generate_index.py，请确保其也适配了 LIVE_WORKSPACE 变量"
           fi
 
-      # 7️⃣ 跨库精准推流：强行同步计算产物到私库
+      # 7️⃣ 跨库精准推流：强行同步计算产物到私库（全量无死角追踪）
       - name: Commit and Push Changes Directly to Private Repo
         run: |
           echo "🔄 正在强行从公开工作区搬运最新计算产物到私库防区..."
@@ -86,8 +86,6 @@ jobs:
           mkdir -p private_repo/hotels
           mkdir -p private_repo/md
           
-          # 注意：由于 rebuild_m3u.py 已经在 private_repo/hotels 里完成了增量更新，
-          # 这里把公开工作区的 hotels 整个同步过去（防止有漏掉的本地产物），或者直接利用私库现有结构
           if [ -d "hotels" ]; then
             cp -r hotels/* private_repo/hotels/ || true
           fi
@@ -114,7 +112,8 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           
-          git add index.html snapshot.json hotels/*.m3u md/traffic_summary.json 2>/dev/null || true
+          # 🎯 关键修改：全量无死角将 hotels 和 md 目录加入暂存区，确保所有单体文件及总表完美同步
+          git add index.html snapshot.json hotels/ md/ 2>/dev/null || true
           
           if git diff --staged --quiet; then
             echo "✅ 暂存区无实质变动，跳过推送。"
