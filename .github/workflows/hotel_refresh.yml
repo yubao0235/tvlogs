@@ -97,7 +97,7 @@ jobs:
         run: |
           echo "🔄 正在强行从公开工作区搬运最新计算产物到私库防区..."
           
-          # 1. 确保私库的 target 文件夹存在
+          # 1. 确保私库的目标文件夹存在
           mkdir -p private_repo/hotels
           mkdir -p private_repo/md
           
@@ -106,12 +106,15 @@ jobs:
             cp -r hotels/* private_repo/hotels/ || true
           fi
           
-          # 3. 强行拷贝最新生成的流量报告和 JSON 账本
+          # 3. 强行拷贝最新生成的流量报告、JSON 账本以及新增的 dead_hosts.txt
           if [ -f "md/traffic_report.txt" ]; then
             cp md/traffic_report.txt private_repo/md/traffic_report.txt || true
           fi
           if [ -f "md/traffic_summary.json" ]; then
             cp md/traffic_summary.json private_repo/md/traffic_summary.json || true
+          fi
+          if [ -f "md/dead_hosts.txt" ]; then
+            cp md/dead_hosts.txt private_repo/md/dead_hosts.txt || true
           fi
           
           # 4. 强行拷贝根目录可能生成的 index.html 和 snapshot.json
@@ -129,8 +132,8 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 6. 精准追踪私库需要更新的内容
-          git add hotels/*.m3u md/traffic_report.txt md/traffic_summary.json index.html snapshot.json 2>/dev/null || true
+          # 6. 精准追踪私库需要更新的内容（⭐️ 已加入 md/dead_hosts.txt）
+          git add hotels/*.m3u md/traffic_report.txt md/traffic_summary.json md/dead_hosts.txt index.html snapshot.json 2>/dev/null || true
           
           if git diff --staged --quiet; then
             echo "✅ 强行比对后发现私库数据文件依然无实质变动，安全跳过推送。"
@@ -138,9 +141,9 @@ jobs:
           fi
 
           # 7. 提交我们需要保留的核心计算产物
-          git commit -m "📊 [公开库托管运行] IPTV 成品大表及测速报告自动覆写: $(date +'%Y-%m-%d %H:%M') [skip ci]"
+          git commit -m "📊 [公开库托管运行] IPTV 成品大表、测速及失效源日志自动覆写: $(date +'%Y-%m-%d %H:%M') [skip ci]"
 
-          # 🌟 核心改进：彻底清除工作区残留的、未提交的其他临时废弃文件，保证绝对干净
+          # 🌟 清理残留临时垃圾文件，为变基扫清障碍
           echo "🧹 正在清理未跟踪的残留临时垃圾文件，为变基扫清障碍..."
           git checkout -- .
           git clean -df || true
