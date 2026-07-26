@@ -125,32 +125,18 @@ jobs:
             cp snapshot.json private_repo/snapshot.json || true
           fi
           
-          # 如果你的 generate_index.py 是直接在 private_repo 里面生成的，这一步可以确保万无一失
-          if [ -f "private_repo/index.html" ] && [ -f "private_repo/snapshot.json" ]; then
-            echo "✅ 网页资产已在私库防区就位"
-          fi
-          
           cd private_repo
           
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 🎯 确保 git add 能够把 snapshot.json 纳进来
-          git add hotels/*.m3u md/traffic_report.txt md/traffic_summary.json md/dead_hosts.txt index.html snapshot.json 2>/dev/null || true
+          # 2️⃣ 必须将 snapshot.json 纳入 git 追踪和暂存区
+          git add index.html snapshot.json hotels/*.m3u md/traffic_summary.json 2>/dev/null || true
           
           if git diff --staged --quiet; then
-            echo "✅ 强行比对后发现私库数据文件依然无实质变动，安全跳过推送。"
+            echo "✅ 暂存区无实质变动，跳过推送。"
             exit 0
           fi
 
-          git commit -m "📊 [公开库托管运行] IPTV 成品大表、测速及失效源日志自动覆写: $(date +'%Y-%m-%d %H:%M') [skip ci]"
-
-          echo "🧹 正在清理未跟踪的残留临时垃圾文件..."
-          git checkout -- .
-          git clean -df || true
-
-          echo "🔄 正在同步远程私库并安全变基..."
-          git pull --rebase -X ours origin main
-
-          echo "🚀 正在将计算成果安全推送到私库..."
+          git commit -m "📊 [自动更新] 同步最新文件结构与 snapshot.json 快照账本: $(date +'%Y-%m-%d %H:%M')"
           git push origin main
