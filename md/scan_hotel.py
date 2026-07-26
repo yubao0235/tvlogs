@@ -48,15 +48,15 @@ def save_realtime(host, channels, tag=""):
         for c in channels:
             f.write(f"{c['name']},http://{host}{c['path']}\n")
         f.write("\n")
-    print(f"✨ [{tag}] 已上线: {host}")
+    print(f"✨ [{tag}] 已上线: {host}", flush=True)
 
 def run_scan():
     if os.path.exists(RESULT_TXT):
         os.remove(RESULT_TXT)
     
-    print(f"📂 正在聚合原始基因，目标防区: {HOTEL_DIR}")
+    print(f"📂 正在聚合原始基因，目标防区: {HOTEL_DIR}", flush=True)
     if not os.path.exists(HOTEL_DIR):
-        print(f"❌ 致命错误: 找不到原始种子目录 {HOTEL_DIR}")
+        print(f"❌ 致命错误: 找不到原始种子目录 {HOTEL_DIR}", flush=True)
         sys.exit(1)
 
     all_genes = {}
@@ -69,7 +69,7 @@ def run_scan():
     final_live_hosts = set()
     failed_genes = {}
 
-    print(f"⚡ 阶段 1: 快速检测 {len(all_genes)} 个原始 IP...")
+    print(f"⚡ 阶段 1: 快速检测 {len(all_genes)} 个原始 IP...", flush=True)
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         future_to_host = {executor.submit(check_url, f"http://{h}{c[0]['path']}"): (h, c) for h, c in all_genes.items()}
         for future in concurrent.futures.as_completed(future_to_host):
@@ -80,7 +80,7 @@ def run_scan():
             else:
                 failed_genes[host] = channels
 
-    print(f"\n📡 阶段 2: 启动 C 段深度扫描 (剩余 {len(failed_genes)} 个待处理网段)...")
+    print(f"\n📡 阶段 2: 启动 C 段深度扫描 (剩余 {len(failed_genes)} 个待处理网段)...", flush=True)
     processed_nets = set()
     completely_dead_hosts = []
 
@@ -97,7 +97,7 @@ def run_scan():
             continue
         
         processed_nets.add(prefix)
-        print(f"🔍 正在扫荡网段: {prefix}.x:{port}...")
+        print(f"🔍 正在扫荡网段: {prefix}.x:{port}...", flush=True)
         
         scan_urls = [f"http://{prefix}.{i}:{port}{channels[0]['path']}" for i in range(1, 255)]
         
@@ -124,14 +124,8 @@ def run_scan():
         for dead_host in sorted(completely_dead_hosts):
             f_dead.write(f"{dead_host}\n")
             
-print(f"✨ [{tag}] 已上线: {host}", flush=True)
-print(f"📂 正在聚合原始基因，目标防区: {HOTEL_DIR}", flush=True)
-print(f"❌ 致命错误: 找不到原始种子目录 {HOTEL_DIR}", flush=True)
-print(f"⚡ 阶段 1: 快速检测 {len(all_genes)} 个原始 IP...", flush=True)
-print(f"\n📡 阶段 2: 启动 C 段深度扫描 (剩余 {len(failed_genes)} 个待处理网段)...", flush=True)
-print(f"🔍 正在扫荡网段: {prefix}.x:{port}...", flush=True)
-print(f"\n✅ 深度扫描结束！结果已写入: {RESULT_TXT}", flush=True)
-print(f"🗑️ 已失效未复活的源 IP 列表已同步写入: {DEAD_TXT}", flush=True)
+    print(f"\n✅ 深度扫描结束！结果已写入: {RESULT_TXT}", flush=True)
+    print(f"🗑️ 已失效未复活的源 IP 列表已同步写入: {DEAD_TXT}", flush=True)
 
 if __name__ == "__main__":
     run_scan()
