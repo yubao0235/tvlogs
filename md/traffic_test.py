@@ -1,75 +1,74 @@
-import requests
+import os
+import json
 import time
 import random
 import re
-import os
-import json
+import requests
 import urllib3
 from urllib.parse import urlparse
 from concurrent.futures import ThreadPoolExecutor
 
-# 1. 禁用 SSL 警告
 urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
-# 2. 路径重定位 (适配 TVlog/md 目录结构)
-# 当前脚本在 TVlog/md 下
-CURRENT_DIR = os.path.dirname(os.path.abspath(__file__))
-# 向上跳一级到 TVlog/，再进入 hotels/ALL.m3u
-SOURCE_M3U = os.path.join(CURRENT_DIR, "..", "hotels", "ALL.m3u")
-# 报告保存在当前 py 文件夹
-OUTPUT_TXT = os.path.join(CURRENT_DIR, "traffic_report.txt")
-OUTPUT_JSON = os.path.join(CURRENT_DIR, "traffic_summary.json")
+# ================= ⚡ 跨库核心动态路径锁定 =================
+WORKSPACE = os.environ.get("LIVE_WORKSPACE", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-# --- 配置 ---
-TEST_DURATION = 10  # 每个 ID 测试 10 秒（GitHub Action 环境建议缩短以防超时）
-SAMPLES_PER_IP = 2  # 每个 IP 随机抽 2 个 ID 压测，兼顾速度与准确度
-MAX_WORKERS = 5     # 并行线程数（GitHub 环境不建议设置过高）
+SOURCE_M3U = os.path.join(WORKSPACE, "hotels", "ALL.m3u")
+OUTPUT_TXT = os.path.join(WORKSPACE, "md", "traffic_report.txt")
+OUTPUT_JSON = os.path.join(WORKSPACE, "md", "traffic_summary.json")
+# ==========================================================
+
+TEST_DURATION = 8   # 适当缩短单源测速时间（8秒），防止 Actions 超时
+SAMPLES_PER_IP = 2  
+MAX_WORKERS = 8     # 控制并发，防止并发过高被运营商防火墙拉黑
 
 def test_stream_traffic(name, url):
-    """模拟播放并统计流量，计算 Mbps"""
     ip_port = urlparse(url).netloc
     start_time = time.time()
     total_bytes = 0
     speeds_mbps = []
-    
     headers = {'User-Agent': 'Mozilla/5.0 (Viera; rv:34.0) Gecko/20100101 Firefox/34.0'}
     
     try:
-        # 获取 m3u8 索引
-        r = requests.get(url, timeout=5, headers=headers, verify=False)
-        if r.status_code != 200: return None
-        
-        # 提取 .ts 切片
-        lines = r.text.split('\n')
+        # 1. 获取 m3u8 列表，增加整体超时控制
+        with requests.get(url, timeout=4, headers=headers, verify=False, stream=True) as r:
+            if r.status_code != 200:
+                return None
+            playlist_text = r.text
+
+        lines = playlist_text.split('\n')
         base_dir = url.rsplit('/', 1)[0]
         ts_lines = [l.strip() for l in lines if l.strip() and not l.startswith('#')]
-        if not ts_lines: return None
+        if not ts_lines:
+            return None
 
-        # 循环下载切片
         while time.time() - start_time < TEST_DURATION:
-            # 优先测试列表末尾的切片（更接近实时）
             target_ts = ts_lines[-2:] if len(ts_lines) > 2 else ts_lines
             for ts_path in target_ts:
-                if time.time() - start_time > TEST_DURATION: break
+                if time.time() - start_time > TEST_DURATION:
+                    break
                 ts_url = ts_path if ts_path.startswith('http') else f"{base_dir}/{ts_path}"
-                
                 ts_start = time.time()
                 try:
-                    ts_r = requests.get(ts_url, timeout=5, headers=headers, stream=True, verify=False)
-                    chunk_bytes = 0
-                    for chunk in ts_r.iter_content(chunk_size=128*1024):
-                        if chunk:
-                            chunk_bytes += len(chunk)
-                            total_bytes += len(chunk)
-                            if time.time() - start_time > TEST_DURATION: break
+                    # 2. 严格加入 timeout=(3, 5) 防止死锁卡死
+                    with requests.get(ts_url, timeout=(3, 5), headers=headers, stream=True, verify=False) as ts_r:
+                        if ts_r.status_code != 200:
+                            continue
+                        chunk_bytes = 0
+                        for chunk in ts_r.iter_content(chunk_size=64 * 1024):
+                            if chunk:
+                                chunk_bytes += len(chunk)
+                                total_bytes += len(chunk)
+                            if time.time() - start_time > TEST_DURATION or (time.time() - ts_start > 3):
+                                break
                     
                     ts_duration = time.time() - ts_start
-                    if ts_duration > 0 and chunk_bytes > 5120: # 至少有 5KB 数据才计入
+                    if ts_duration > 0 and chunk_bytes > 4096:
                         mbps = (chunk_bytes * 8) / (ts_duration * 1024 * 1024)
                         speeds_mbps.append(mbps)
-                except: continue
-            time.sleep(0.5) 
-
+                except:
+                    continue
+            time.sleep(0.3)
     except:
         return None
 
@@ -89,7 +88,7 @@ def test_stream_traffic(name, url):
     return None
 
 def save_reports(results, group_summary):
-    """保存结果"""
+    os.makedirs(os.path.dirname(OUTPUT_TXT), exist_ok=True)
     with open(OUTPUT_TXT, 'w', encoding='utf-8') as f:
         f.write("="*75 + "\n")
         f.write(f"📡 IPTV 酒店源测速报告 | 时间: {time.strftime('%Y-%m-%d %H:%M:%S')}\n")
@@ -107,17 +106,16 @@ def save_reports(results, group_summary):
         json.dump({"summary": group_summary, "details": results}, f, ensure_ascii=False, indent=2)
 
 def main():
-    print(f"🚀 开始在 TVlog 仓库测速...")
-    print(f"📂 目标源文件: {os.path.abspath(SOURCE_M3U)}")
+    print(f"🚀 启动流媒体全自动测速引擎...")
+    print(f"📂 正在读取成品大表: {SOURCE_M3U}")
     
     if not os.path.exists(SOURCE_M3U):
-        print(f"❌ 错误: 找不到源文件 {SOURCE_M3U}，请检查目录结构。")
+        print(f"❌ 错误: 找不到源文件 {SOURCE_M3U}，测速被迫中断。")
         return
 
-    with open(SOURCE_M3U, 'r', encoding='utf-8') as f:
+    with open(SOURCE_M3U, 'r', encoding='utf-8', errors='ignore') as f:
         content = f.read()
 
-    # 解析 M3U
     groups = {}
     lines = content.split('\n')
     for i in range(len(lines)):
@@ -125,26 +123,27 @@ def main():
             url = lines[i+1].strip()
             if url.startswith('http'):
                 ip_port = urlparse(url).netloc
-                if ip_port not in groups: groups[ip_port] = []
-                name = re.search(r',(.+)$', lines[i]).group(1).strip() if ',' in lines[i] else "Unknown"
+                if ip_port not in groups:
+                    groups[ip_port] = []
+                name_match = re.search(r',(.+)$', lines[i])
+                name = name_match.group(1).strip() if name_match else "Unknown"
                 groups[ip_port].append((name, url))
 
-    # 抽样
     tasks = []
     for ip_port, urls in groups.items():
         samples = random.sample(urls, min(len(urls), SAMPLES_PER_IP))
         tasks.extend(samples)
 
-    print(f"📡 识别到 {len(groups)} 个 IP 源，准备测试 {len(tasks)} 个样本...")
+    print(f"📡 识别到 {len(groups)} 个有效网段，随机抽取 {len(tasks)} 个流样本进行压测...")
 
     results = []
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = [executor.submit(test_stream_traffic, n, u) for n, u in tasks]
         for future in futures:
             res = future.result()
-            if res: results.append(res)
+            if res:
+                results.append(res)
 
-    # 汇总
     group_summary = {}
     for res in results:
         ip = res['ip_port']
@@ -156,11 +155,14 @@ def main():
         s["max_mbps"] = max(s["max_mbps"], res['max_mbps'])
 
     for ip, data in group_summary.items():
-        data["avg_mbps"] = round(sum(data["speeds"]) / len(data["speeds"]), 2)
+        if data["speeds"]:
+            data["avg_mbps"] = round(sum(data["speeds"]) / len(data["speeds"]), 2)
+        else:
+            data["avg_mbps"] = 0.0
         del data["speeds"]
 
     save_reports(results, group_summary)
-    print(f"✅ 测速完成！\n📄 文本报告: {OUTPUT_TXT}\n📦 JSON汇总: {OUTPUT_JSON}")
+    print(f"✅ 测速报告已成功输出至私库 md/ 目录！")
 
 if __name__ == "__main__":
     main()
