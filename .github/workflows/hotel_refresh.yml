@@ -62,7 +62,16 @@ jobs:
         run: |
           python md/rebuild_m3u.py
 
-      # 6️⃣ 运行多线程流媒体测速
+      # 6️⃣ 【安全护甲还原提前】在测速前，提前合流新老成品资源，确保老资产也能被测速
+      - name: Restore Non-Updated Finished Assets (Before Speed Test)
+        run: |
+          if [ -d "private_repo/hotels_backup" ]; then
+            echo "🔄 正在跨目录比对，提前强制补回未参与本次洗版的历史成品资产..."
+            cp -n private_repo/hotels_backup/* private_repo/hotels/ 2>/dev/null || true
+            rm -rf private_repo/hotels_backup
+          fi
+
+      # 7️⃣ 运行多线程流媒体测速（此时测速的是包含新老资产的完整库）
       - name: IPTV Speed Test
         env:
           PYTHONUNBUFFERED: "1"
@@ -72,14 +81,6 @@ jobs:
             python md/traffic_test.py
           else
             echo "⚠️ 找不到测速脚本，跳过此步"
-          fi
-      # 7️⃣ 【安全护甲还原】补回未参与本次清洗的历史成品资源
-      - name: Restore Non-Updated Finished Assets
-        run: |
-          if [ -d "private_repo/hotels_backup" ]; then
-            echo "🔄 正在跨目录比对，强制补回未参与本次洗版的历史成品资产..."
-            cp -n private_repo/hotels_backup/* private_repo/hotels/ 2>/dev/null || true
-            rm -rf private_repo/hotels_backup
           fi
 
       # 8️⃣ 运行大表索引前端生成
