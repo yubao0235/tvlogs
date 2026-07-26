@@ -38,15 +38,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install requests tqdm urllib3 aiohttp
 
-      # 3️⃣ 【安全护甲】在运行前，备份私库中原有的成品大表，防止被物理抹除
-      - name: Create Private Repo Finished Assets Backup
-        run: |
-          if [ -d "private_repo/hotels" ]; then
-            cp -r private_repo/hotels private_repo/hotels_backup
-            echo "✅ 成功为私库的成品资产建立了全隔离安全防区"
-          fi
-
-      # 4️⃣ 运行爆破扫描
+      # 3️⃣ 运行爆破扫描（生成最新原始数据）
       - name: Run Real-time Execution Scan
         env:
           PYTHONUNBUFFERED: "1"
@@ -54,28 +46,19 @@ jobs:
         run: |
           python md/scan_hotel.py
 
-      # 5️⃣ 运行清洗重组
-      - name: Rebuild M3U Lists
+      # 4️⃣ 运行智能洗版与全量融合（新老资产在脚本内部自动合流并生成完整的 ALL.m3u）
+      - name: Rebuild and Merge M3U Lists
         env:
           PYTHONUNBUFFERED: "1"
           LIVE_WORKSPACE: ${{ github.workspace }}/private_repo
         run: |
           python md/rebuild_m3u.py
 
-      # 6️⃣ 【安全护甲还原提前】在测速前，提前合流新老成品资源，确保老资产也能被测速
-      - name: Restore Non-Updated Finished Assets (Before Speed Test)
-        run: |
-          if [ -d "private_repo/hotels_backup" ]; then
-            echo "🔄 正在跨目录比对，提前强制补回未参与本次洗版的历史成品资产..."
-            cp -n private_repo/hotels_backup/* private_repo/hotels/ 2>/dev/null || true
-            rm -rf private_repo/hotels_backup
-          fi
-
-      # 7️⃣ 运行多线程流媒体测速（此时测速的是包含新老资产的完整库）
+      # 5️⃣ 运行多线程流媒体测速（此时读取的是包含所有新老源的完整 ALL.m3u）
       - name: IPTV Speed Test
         env:
           PYTHONUNBUFFERED: "1"
-          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo  # 🎯 关键：把私库路径传进去
+          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo  # 🎯 传递私库路径
         run: |
           if [ -f "md/traffic_test.py" ]; then
             python md/traffic_test.py
@@ -83,7 +66,7 @@ jobs:
             echo "⚠️ 找不到测速脚本，跳过此步"
           fi
 
-      # 8️⃣ 运行大表索引前端生成
+      # 6️⃣ 运行大表索引前端生成
       - name: Generate Web Index
         env:
           PYTHONUNBUFFERED: "1"
@@ -95,7 +78,7 @@ jobs:
             echo "ℹ️ 如果有 generate_index.py，请确保其也适配了 LIVE_WORKSPACE 变量"
           fi
 
-      # 9️⃣ 跨库精准推流：强行同步计算产物到私库
+      # 7️⃣ 跨库精准推流：强行同步计算产物到私库
       - name: Commit and Push Changes Directly to Private Repo
         run: |
           echo "🔄 正在强行从公开工作区搬运最新计算产物到私库防区..."
@@ -103,6 +86,8 @@ jobs:
           mkdir -p private_repo/hotels
           mkdir -p private_repo/md
           
+          # 注意：由于 rebuild_m3u.py 已经在 private_repo/hotels 里完成了增量更新，
+          # 这里把公开工作区的 hotels 整个同步过去（防止有漏掉的本地产物），或者直接利用私库现有结构
           if [ -d "hotels" ]; then
             cp -r hotels/* private_repo/hotels/ || true
           fi
@@ -139,7 +124,7 @@ jobs:
           git commit -m "📊 [自动更新] 同步最新文件结构与 snapshot.json 快照账本: $(date +'%Y-%m-%d %H:%M')"
           git push origin main
 
-      # 🔟 联动 Cloudflare API 自动清空边缘缓存
+      # 8️⃣ 联动 Cloudflare API 自动清空边缘缓存
       - name: Purge Cloudflare Cache
         env:
           CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
