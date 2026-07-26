@@ -18,9 +18,9 @@ OUTPUT_TXT = os.path.join(WORKSPACE, "md", "traffic_report.txt")
 OUTPUT_JSON = os.path.join(WORKSPACE, "md", "traffic_summary.json")
 # ==========================================================
 
-TEST_DURATION = 8   # 适当缩短单源测速时间（8秒），防止 Actions 超时
+TEST_DURATION = 8   
 SAMPLES_PER_IP = 2  
-MAX_WORKERS = 8     # 控制并发，防止并发过高被运营商防火墙拉黑
+MAX_WORKERS = 8     
 
 def test_stream_traffic(name, url):
     ip_port = urlparse(url).netloc
@@ -30,7 +30,6 @@ def test_stream_traffic(name, url):
     headers = {'User-Agent': 'Mozilla/5.0 (Viera; rv:34.0) Gecko/20100101 Firefox/34.0'}
     
     try:
-        # 1. 获取 m3u8 列表，增加整体超时控制
         with requests.get(url, timeout=4, headers=headers, verify=False, stream=True) as r:
             if r.status_code != 200:
                 return None
@@ -50,7 +49,6 @@ def test_stream_traffic(name, url):
                 ts_url = ts_path if ts_path.startswith('http') else f"{base_dir}/{ts_path}"
                 ts_start = time.time()
                 try:
-                    # 2. 严格加入 timeout=(3, 5) 防止死锁卡死
                     with requests.get(ts_url, timeout=(3, 5), headers=headers, stream=True, verify=False) as ts_r:
                         if ts_r.status_code != 200:
                             continue
