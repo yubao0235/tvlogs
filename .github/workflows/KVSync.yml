@@ -1,4 +1,4 @@
-name: Public Repo KV Auto-Sync
+name: Public Repo & Private Sync KV Auto-Sync
 
 on:
   push:
@@ -29,7 +29,7 @@ jobs:
         with:
           python-version: '3.10'
 
-      # 1️⃣ 按层级路径打包生成 snapshot.json
+      # 1️⃣ 按层级路径打包生成带有统一时间戳的 snapshot.json
       - name: Generate Hierarchical Snapshot JSON
         run: |
           echo "📦 正在将公开库最新 hotel、hotels 及 md 目录按层级路径打包成 snapshot.json..."
@@ -50,7 +50,7 @@ jobs:
               if os.path.exists(d):
                   for dirpath, _, filenames in os.walk(d):
                       if ".git" in dirpath or ".github" in dirpath:
-                          continue
+                        continue
                       for f in filenames:
                           full_path = os.path.join(dirpath, f)
                           rel_path = os.path.relpath(full_path, root_dir).replace("\\", "/")
@@ -63,10 +63,10 @@ jobs:
           with open("snapshot.json", "w", encoding="utf-8") as out:
               json.dump(snapshot, out, ensure_ascii=False)
 
-          print(f"✅ snapshot.json 打包成功！共收录了 {len(snapshot['files'])} 个资产文件。")
+          print(f"✅ snapshot.json 打包成功！时间戳: {snapshot['updated_at']}，共收录了 {len(snapshot['files'])} 个资产文件。")
           EOF
 
-      # 2️⃣ 直推 snapshot.json 到 Cloudflare KV
+      # 2️⃣ 将带有该时间戳的 snapshot.json 直推到 Cloudflare KV
       - name: Upload Snapshot to Cloudflare KV
         env:
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
@@ -93,7 +93,7 @@ jobs:
             exit 1
           fi
 
-      # 3️⃣ 把生成的 snapshot.json 提交回公开库保存
+      # 3️⃣ 把生成的 snapshot.json 提交并保存回公开库
       - name: Commit snapshot.json to Public Repo
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
@@ -102,9 +102,41 @@ jobs:
           git add snapshot.json 2>/dev/null || true
           
           if git diff --staged --quiet; then
-            echo "✅ snapshot.json 没有变动。"
+            echo "✅ 公开库 snapshot.json 没有变动。"
           else
-            git commit -m "📊 [自动更新] 同步最新文件结构与 snapshot.json 快照账本: $(date +'%Y-%m-%d %H:%M') [skip ci]"
+            git commit -m "📊 [自动更新] 同步最新 snapshot.json 快照账本: $(date +'%Y-%m-%d %H:%M') [skip ci]"
             git push origin main
             echo "✅ snapshot.json 已成功提交回公开库。"
+          fi
+
+      # 4️⃣ 【新增】将带相同时间戳的 snapshot.json 自动同步推送到你的私库中
+      - name: Sync snapshot.json to Private Repo
+        env:
+          LIVE_TOKEN: ${{ secrets.LIVE_TOKEN }}
+          LIVE_REPO: ${{ secrets.LIVE_REPO }}
+        run: |
+          if [ -z "$LIVE_TOKEN" ] || [ -z "$LIVE_REPO" ]; then
+            echo "⚠️ 未检测到私库的 LIVE_TOKEN 或 LIVE_REPO 密钥，跳过私库同步。"
+            exit 0
+          fi
+          
+          echo "🔄 正在克隆私库以同步最新快照..."
+          git clone https://x-access-token:${LIVE_TOKEN}@github.com/${LIVE_REPO}.git private_sync_repo
+          
+          cd private_sync_repo
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # 将公开库刚刚生成的 snapshot.json 复制到私库根目录
+          cp ../snapshot.json ./snapshot.json
+          
+          git add snapshot.json
+          
+          if git diff --staged --quiet; then
+            echo "✅ 私库中的 snapshot.json 已经是最新，无需重复提交。"
+          else
+            git commit -m "🔄 [公开库同步] 更新一致的时间戳快照 snapshot.json: $(date +'%Y-%m-%d %H:%M') [skip ci]"
+            git pull --rebase -X ours origin main || true
+            git push origin main
+            echo "✅ 私库 snapshot.json 已成功同步，时间戳与 KV 完全一致！"
           fi
