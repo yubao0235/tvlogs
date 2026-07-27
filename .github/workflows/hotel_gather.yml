@@ -73,17 +73,15 @@ jobs:
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # 🎯 【安全机制 3】精准追踪 hotel 目录下的新增和修改源文件
-          git add hotel/*.m3u
+          # 🎯 追踪 hotel 目录下的文件变动
+          git add hotel/*.m3u 2>/dev/null || true
           
-          if git diff --staged --quiet; then
-            echo "✅ 私库数据对比没有发现任何新变化，安全跳过提交。"
-          else
-            git commit -m "📊 增量覆盖更新：[公开库代工] Hotel IPTV 列表 $(date +'%Y-%m-%d %H:%M') [skip ci]"
-            
-            echo "🔄 正在拉取远程私库最新状态并安全变基..."
-            git pull --rebase -X ours origin main
-            
-            echo "🚀 正在将抓取成果安全同步至私库中..."
-            git push origin main
-          fi
+          # 无论 git diff 是否有变动，都强制执行 commit：
+          # 如果有文件变动，会正常提交这些文件；如果没有变动，则会创建一个空的 commit 来刷新时间戳
+          git commit --allow-empty -m "🔄 定时巡检时间戳刷新：[公开库代工] $(date +'%Y-%m-%d %H:%M') [skip ci]"
+          
+          echo "🔄 正在拉取远程私库最新状态并安全变基..."
+          git pull --rebase -X ours origin main
+          
+          echo "🚀 正在将最新状态（含最新时间戳）强制同步至私库中..."
+          git push origin main
