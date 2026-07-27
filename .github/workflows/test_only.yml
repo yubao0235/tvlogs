@@ -42,7 +42,7 @@ jobs:
         env:
           LIVE_WORKSPACE: ${{ github.workspace }}/private_repo  # 🎯 指向私库防区
         run: |
-          python traffic_test.py
+          python md/traffic_test.py
 
       # 6. 自动提交并推送测速报告回到私库（或者按需提交）
       - name: Commit and Push Reports to Private Repo
