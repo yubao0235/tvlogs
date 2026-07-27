@@ -34,7 +34,7 @@ jobs:
         env:
           LIVE_WORKSPACE: ${{ github.workspace }}
         run: |
-          python traffic_test.py
+          python md/traffic_test.py
 
       # 5. 自动提交并推送测速报告到仓库
       - name: Commit and Push Reports
