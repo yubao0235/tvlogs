@@ -66,19 +66,7 @@ jobs:
             echo "⚠️ 找不到测速脚本，跳过此步"
           fi
 
-      # 6️⃣ 运行大表索引前端生成
-      - name: Generate Web Index
-        env:
-          PYTHONUNBUFFERED: "1"
-          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo
-        run: |
-          if [ -f "md/generate_index.py" ]; then
-            python md/generate_index.py
-          else
-            echo "ℹ️ 如果有 generate_index.py，请确保其也适配了 LIVE_WORKSPACE 变量"
-          fi
-
-      # 7️⃣ 跨库精准推流：强行同步计算产物到私库（全量无死角追踪）
+      # 6️⃣ 跨库精准推流：强行同步计算产物到私库（全量无死角追踪）
       - name: Commit and Push Changes Directly to Private Repo
         run: |
           echo "🔄 正在强行从公开工作区搬运最新计算产物到私库防区..."
@@ -100,30 +88,23 @@ jobs:
             cp md/dead_hosts.txt private_repo/md/dead_hosts.txt || true
           fi
           
-          if [ -f "index.html" ]; then
-            cp index.html private_repo/index.html || true
-          fi
-          if [ -f "snapshot.json" ]; then
-            cp snapshot.json private_repo/snapshot.json || true
-          fi
-          
           cd private_repo
           
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 🎯 关键修改：全量无死角将 hotels 和 md 目录加入暂存区，确保所有单体文件及总表完美同步
-          git add index.html snapshot.json hotels/ md/ 2>/dev/null || true
+          # 🎯 仅对实际产物目录执行 git add
+          git add hotels/ md/ 2>/dev/null || true
           
           if git diff --staged --quiet; then
             echo "✅ 暂存区无实质变动，跳过推送。"
             exit 0
           fi
 
-          git commit -m "📊 [自动更新] 同步最新文件结构与 snapshot.json 快照账本: $(date +'%Y-%m-%d %H:%M')"
+          git commit -m "📊 [自动更新] 同步最新 IPTV 测速与洗版产物: $(date +'%Y-%m-%d %H:%M')"
           git push origin main
 
-      # 8️⃣ 联动 Cloudflare API 自动清空边缘缓存
+      # 7️⃣ 联动 Cloudflare API 自动清空边缘缓存
       - name: Purge Cloudflare Cache
         env:
           CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
