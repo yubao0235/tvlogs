@@ -87,6 +87,9 @@ jobs:
           if [ -f "md/dead_hosts.txt" ]; then
             cp md/dead_hosts.txt private_repo/md/dead_hosts.txt || true
           fi
+          if [ -f "hotel_output.txt" ]; then
+            cp hotel_output.txt private_repo/hotel_output.txt || true
+          fi        
           
           cd private_repo
           
