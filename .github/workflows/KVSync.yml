@@ -1,78 +1,61 @@
-name: Public Repo IPTV Gather & Cloudflare KV Sync
+name: Public Repo KV Auto-Sync
 
 on:
-  schedule:
-    - cron: '10 */4 * * *'  # 每 4 小时的第 10 分钟自动运行
-  workflow_dispatch:          
+  push:
+    branches:
+      - main
+    paths:
+      - 'hotel/**'
+      - 'hotels/**'
+      - 'md/**'
+  workflow_dispatch:          # 支持手动一键触发
 
 concurrency:
-  group: ${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  group: public-kv-sync-${{ github.ref }}
+  cancel-in-progress: false   # 确保每次更新都能完整执行完
 
 jobs:
-  gather_and_sync:
+  pack_and_push:
     runs-on: ubuntu-latest
-    
-    env:
-      CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
-      CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
-      CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
 
     steps:
-      # 1️⃣ 检出公开库
-      - name: Checkout Public Repo
+      - name: Checkout Public Repository
         uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
 
-      # 2️⃣ 设置 Python 环境
-      - name: Set up Python
+      - name: Setup Python Environment
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
 
-      # 3️⃣ 安装依赖
-      - name: Install Dependencies
+      # 1️⃣ 按层级路径打包生成 snapshot.json
+      - name: Generate Hierarchical Snapshot JSON
         run: |
-          python -m pip install --upgrade pip
-          pip install httpx
-
-      # 4️⃣ 运行公开库本地的抓取脚本（直接输出到公开库自身的目录中，例如 hotel/ 或 md/）
-      - name: Run Hotel Gather Script
-        env:
-          PYTHONUNBUFFERED: "1"  
-        run: |
-          echo "🚀 开始在公开库执行酒店源自动化抓取与归属地解析..."
-          python md/hotel_gather.py
-
-      # 5️⃣ 直接在公开库打包本地资产并直推 Cloudflare KV
-      - name: Direct Sync Snapshot to Cloudflare KV
-        run: |
-          echo "📦 正在公开库运行环境打包本地资产..."
+          echo "📦 正在将公开库最新 hotel、hotels 及 md 目录按层级路径打包成 snapshot.json..."
           python - << 'EOF'
           import os
           import json
           import time
 
-          # 🎯 直接以公开库根目录为准
-          base_dir = "."
+          root_dir = "."
           target_dirs = ["hotel", "hotels", "md"]
-          
+
           snapshot = {
               "updated_at": time.strftime('%Y-%m-%d %H:%M:%S'),
               "files": {}
           }
 
           for d in target_dirs:
-              dir_path = os.path.join(base_dir, d)
-              if os.path.exists(dir_path):
-                  for dirpath, _, filenames in os.walk(dir_path):
-                      # 排除隐藏文件夹或工作流文件夹
+              if os.path.exists(d):
+                  for dirpath, _, filenames in os.walk(d):
                       if ".git" in dirpath or ".github" in dirpath:
                           continue
                       for f in filenames:
-                          abs_path = os.path.join(dirpath, f)
-                          rel_path = os.path.relpath(abs_path, base_dir).replace("\\", "/")
+                          full_path = os.path.join(dirpath, f)
+                          rel_path = os.path.relpath(full_path, root_dir).replace("\\", "/")
                           try:
-                              with open(abs_path, "r", encoding="utf-8", errors="ignore") as file_obj:
+                              with open(full_path, "r", encoding="utf-8", errors="ignore") as file_obj:
                                   snapshot["files"][rel_path] = file_obj.read()
                           except Exception as e:
                               print(f"⚠️ 读取文件 {rel_path} 失败: {e}")
@@ -80,10 +63,18 @@ jobs:
           with open("snapshot.json", "w", encoding="utf-8") as out:
               json.dump(snapshot, out, ensure_ascii=False)
 
-          print(f"✅ snapshot.json 生成成功！共收录了 {len(snapshot['files'])} 个公开库资产文件。")
+          print(f"✅ snapshot.json 打包成功！共收录了 {len(snapshot['files'])} 个资产文件。")
           EOF
 
+      # 2️⃣ 直推 snapshot.json 到 Cloudflare KV
+      - name: Upload Snapshot to Cloudflare KV
+        env:
+          CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
+          CF_KV_NAMESPACE_ID: ${{ secrets.CF_KV_NAMESPACE_ID }}
+          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
+        run: |
           echo "🚀 正在将最新快照直接推送至 Cloudflare KV..."
+          
           if [ -f "snapshot.json" ]; then
             RESPONSE=$(curl -s -X PUT \
               "https://api.cloudflare.com/client/v4/accounts/$CF_ACCOUNT_ID/storage/kv/namespaces/$CF_KV_NAMESPACE_ID/values/iptv_snapshot" \
@@ -92,9 +83,9 @@ jobs:
               
             echo "Cloudflare KV 响应: $RESPONSE"
             if echo "$RESPONSE" | grep -q '"success":true'; then
-              echo "✅ 成功将最新资产与时间戳同步到 Cloudflare KV！"
+              echo "✅ 成功同步到 Cloudflare KV！"
             else
-              echo "⚠️ KV 写入失败，请检查公开库 Secrets 配置。"
+              echo "⚠️ KV 写入失败，请检查公开库中的 Cloudflare Secrets 配置。"
               exit 1
             fi
           else
@@ -102,18 +93,18 @@ jobs:
             exit 1
           fi
 
-      # 6️⃣ （可选）把公开库自己生成的最新 m3u 和 snapshot.json 提交回公开库保存
-      - name: Commit Back to Public Repo
+      # 3️⃣ 把生成的 snapshot.json 提交回公开库保存
+      - name: Commit snapshot.json to Public Repo
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          git add hotel/ hotels/ md/ snapshot.json 2>/dev/null || true
+          git add snapshot.json 2>/dev/null || true
           
           if git diff --staged --quiet; then
-            echo "✅ 没有检测到文件变动。"
+            echo "✅ snapshot.json 没有变动。"
           else
-            git commit -m "📊 自动更新：IPTV 抓取与 KV 快照同步 $(date +'%Y-%m-%d %H:%M') [skip ci]"
+            git commit -m "📊 [自动更新] 同步最新文件结构与 snapshot.json 快照账本: $(date +'%Y-%m-%d %H:%M') [skip ci]"
             git push origin main
-            echo "✅ 公开库自身状态已同步更新。"
+            echo "✅ snapshot.json 已成功提交回公开库。"
           fi
