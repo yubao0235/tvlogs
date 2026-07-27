@@ -1,9 +1,7 @@
 name: IPTV Traffic Speed Test
 
 on:
-  # 允许在 GitHub Actions 页面手动触发
   workflow_dispatch:
-  # 定时任务：例如每天凌晨 3:00 执行一次
   schedule:
     - cron: '0 3 * * *'
 
@@ -12,34 +10,50 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 检出代码仓库
+      # 1. 检出公开库（作为算力节点容器）
       - name: Checkout Repository
         uses: actions/checkout@v4
 
-      # 2. 设置 Python 环境
+      # 🎯 2. 【新增】跨库检出私库，并将其放入 private_repo 目录
+      - name: Checkout Private Data Repo
+        uses: actions/checkout@v4
+        with:
+          repository: ${{ secrets.LIVE_REPO }}
+          token: ${{ secrets.LIVE_TOKEN }}
+          fetch-depth: 0
+          path: private_repo
+          persist-credentials: true
+
+      # 3. 设置 Python 环境
       - name: Set up Python
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
           cache: 'pip'
 
-      # 3. 安装脚本依赖
+      # 4. 安装脚本依赖
       - name: Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install requests
 
-      # 4. 执行测速脚本
+      # 5. 执行测速脚本，并将工作区变量指定到私库目录
       - name: Run Traffic Test Script
         env:
-          LIVE_WORKSPACE: ${{ github.workspace }}
+          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo  # 🎯 指向私库防区
         run: |
-          python md/traffic_test.py
+          python traffic_test.py
 
-      # 5. 自动提交并推送测速报告到仓库
-      - name: Commit and Push Reports
+      # 6. 自动提交并推送测速报告回到私库（或者按需提交）
+      - name: Commit and Push Reports to Private Repo
         run: |
-          git config --global user.name 'github-actions[bot]'
-          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
-          git add md/traffic_report.txt md/traffic_summary.json
-          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update traffic speed test report [skip ci]" && git push)
+          cd private_repo
+          git config --local user.name 'github-actions[bot]'
+          git config --local user.email 'github-actions[bot]@users.noreply.github.com'
+          
+          if [ -f "md/traffic_report.txt" ] || [ -f "md/traffic_summary.json" ]; then
+            git add md/traffic_report.txt md/traffic_summary.json 2>/dev/null || true
+            git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update traffic speed test report [skip ci]" && git push)
+          else
+            echo "⚠️ 未检测到生成的测速报告文件，跳过提交。"
+          fi
