@@ -1,25 +1,18 @@
-name: Public Repo & Private Sync KV Auto-Sync
+name: Full Private Repo KV Auto-Sync
 
 on:
-  push:
-    branches:
-      - main
-    paths:
-      - 'hotel/**'
-      - 'hotels/**'
-      - 'md/**'
-  workflow_dispatch:          # 支持手动一键触发
+  workflow_dispatch:          # 支持手动触发
 
 concurrency:
-  group: public-kv-sync-${{ github.ref }}
-  cancel-in-progress: false   # 确保每次更新都能完整执行完
+  group: full-private-kv-sync-${{ github.ref }}
+  cancel-in-progress: false
 
 jobs:
   pack_and_push:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Public Repository
+      - name: Checkout Public Repository (仅存放工作流文件)
         uses: actions/checkout@v4
         with:
           fetch-depth: 0
@@ -29,16 +22,31 @@ jobs:
         with:
           python-version: '3.10'
 
-      # 1️⃣ 按层级路径打包生成带有统一时间戳的 snapshot.json
-      - name: Generate Hierarchical Snapshot JSON
+      # 1️⃣ 把完整的私库（存有 hotel、hotels 和 md 文件夹）克隆下来
+      - name: Clone Private Repository
+        env:
+          LIVE_TOKEN: ${{ secrets.LIVE_TOKEN }}
+          LIVE_REPO: ${{ secrets.LIVE_REPO }}
         run: |
-          echo "📦 正在将公开库最新 hotel、hotels 及 md 目录按层级路径打包成 snapshot.json..."
+          if [ -z "$LIVE_TOKEN" ] || [ -z "$LIVE_REPO" ]; then
+            echo "❌ 错误: 未配置私库的 LIVE_TOKEN 或 LIVE_REPO 密钥！"
+            exit 1
+          fi
+          echo "🔄 正在克隆私库以获取全部三个核心文件夹..."
+          git clone https://x-access-token:${LIVE_TOKEN}@github.com/${LIVE_REPO}.git private_source_repo
+
+      # 2️⃣ 从私库中读取三个文件夹并打包成 snapshot.json
+      - name: Generate Hierarchical Snapshot JSON from Private Repo
+        run: |
+          echo "📦 正在打包私库中的 hotel、hotels 及 md 目录..."
           python - << 'EOF'
           import os
           import json
           import time
 
           root_dir = "."
+          # 三个文件夹全部指向私库的克隆目录
+          source_base = "private_source_repo"
           target_dirs = ["hotel", "hotels", "md"]
 
           snapshot = {
@@ -47,18 +55,24 @@ jobs:
           }
 
           for d in target_dirs:
-              if os.path.exists(d):
-                  for dirpath, _, filenames in os.walk(d):
+              disk_path = os.path.join(source_base, d)
+              if os.path.exists(disk_path):
+                  print(f"📁 成功加载私库目录: {disk_path}")
+                  for dirpath, _, filenames in os.walk(disk_path):
                       if ".git" in dirpath or ".github" in dirpath:
-                        continue
+                          continue
                       for f in filenames:
                           full_path = os.path.join(dirpath, f)
-                          rel_path = os.path.relpath(full_path, root_dir).replace("\\", "/")
+                          rel_from_base = os.path.relpath(full_path, source_base)
+                          rel_path = rel_from_base.replace("\\", "/")
+                          
                           try:
                               with open(full_path, "r", encoding="utf-8", errors="ignore") as file_obj:
                                   snapshot["files"][rel_path] = file_obj.read()
                           except Exception as e:
                               print(f"⚠️ 读取文件 {rel_path} 失败: {e}")
+              else:
+                  print(f"❌ 警告: 私库目录 {disk_path} 不存在！")
 
           with open("snapshot.json", "w", encoding="utf-8") as out:
               json.dump(snapshot, out, ensure_ascii=False)
@@ -66,7 +80,7 @@ jobs:
           print(f"✅ snapshot.json 打包成功！时间戳: {snapshot['updated_at']}，共收录了 {len(snapshot['files'])} 个资产文件。")
           EOF
 
-      # 2️⃣ 将带有该时间戳的 snapshot.json 直推到 Cloudflare KV
+      # 3️⃣ 将带有统一时间戳的 snapshot.json 推送到 Cloudflare KV
       - name: Upload Snapshot to Cloudflare KV
         env:
           CF_ACCOUNT_ID: ${{ secrets.CF_ACCOUNT_ID }}
@@ -85,7 +99,7 @@ jobs:
             if echo "$RESPONSE" | grep -q '"success":true'; then
               echo "✅ 成功同步到 Cloudflare KV！"
             else
-              echo "⚠️ KV 写入失败，请检查公开库中的 Cloudflare Secrets 配置。"
+              echo "⚠️ KV 写入失败，请检查 Cloudflare Secrets 配置。"
               exit 1
             fi
           else
@@ -93,7 +107,7 @@ jobs:
             exit 1
           fi
 
-      # 3️⃣ 把生成的 snapshot.json 提交并保存回公开库
+      # 4️⃣ 把 snapshot.json 提交保存回公开库
       - name: Commit snapshot.json to Public Repo
         run: |
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
@@ -109,33 +123,20 @@ jobs:
             echo "✅ snapshot.json 已成功提交回公开库。"
           fi
 
-      # 4️⃣ 【新增】将带相同时间戳的 snapshot.json 自动同步推送到你的私库中
+      # 5️⃣ 把带有相同时间戳的 snapshot.json 同步推送到私库根目录
       - name: Sync snapshot.json to Private Repo
-        env:
-          LIVE_TOKEN: ${{ secrets.LIVE_TOKEN }}
-          LIVE_REPO: ${{ secrets.LIVE_REPO }}
         run: |
-          if [ -z "$LIVE_TOKEN" ] || [ -z "$LIVE_REPO" ]; then
-            echo "⚠️ 未检测到私库的 LIVE_TOKEN 或 LIVE_REPO 密钥，跳过私库同步。"
-            exit 0
-          fi
-          
-          echo "🔄 正在克隆私库以同步最新快照..."
-          git clone https://x-access-token:${LIVE_TOKEN}@github.com/${LIVE_REPO}.git private_sync_repo
-          
-          cd private_sync_repo
+          cd private_source_repo
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           git config --local user.name "github-actions[bot]"
           
-          # 将公开库刚刚生成的 snapshot.json 复制到私库根目录
           cp ../snapshot.json ./snapshot.json
-          
           git add snapshot.json
           
           if git diff --staged --quiet; then
-            echo "✅ 私库中的 snapshot.json 已经是最新，无需重复提交。"
+            echo "✅ 私库中的 snapshot.json 已经是最新。"
           else
-            git commit -m "🔄 [公开库同步] 更新一致的时间戳快照 snapshot.json: $(date +'%Y-%m-%d %H:%M') [skip ci]"
+            git commit -m "🔄 [同步] 更新一致的时间戳快照 snapshot.json: $(date +'%Y-%m-%d %H:%M') [skip ci]"
             git pull --rebase -X ours origin main || true
             git push origin main
             echo "✅ 私库 snapshot.json 已成功同步，时间戳与 KV 完全一致！"
