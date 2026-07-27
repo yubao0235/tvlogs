@@ -2,7 +2,7 @@ name: Hotel IPTV Auto Gather (Runner Mode)
 
 on:
   schedule:
-    - cron: '10 */4 * * *'  # 每 4 小时的第 10 分钟自动运行
+    - cron: '15 */8 * * *'  # 每 4 小时的第 10 分钟自动运行
   workflow_dispatch:         
 
 concurrency:
