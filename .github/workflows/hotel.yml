@@ -103,22 +103,3 @@ jobs:
 
           git commit -m "📊 [自动更新] 同步最新 IPTV 测速与洗版产物: $(date +'%Y-%m-%d %H:%M')"
           git push origin main
-
-      # 7️⃣ 联动 Cloudflare API 自动清空边缘缓存
-      - name: Purge Cloudflare Cache
-        env:
-          CF_ZONE_ID: ${{ secrets.CF_ZONE_ID }}
-          CF_API_TOKEN: ${{ secrets.CF_API_TOKEN }}
-        run: |
-          echo "🧹 正在向 Cloudflare 发送边缘缓存清理指令..."
-          RESPONSE=$(curl -s -X POST "https://api.cloudflare.com/client/v4/zones/$CF_ZONE_ID/purge_cache" \
-               -H "Authorization: Bearer $CF_API_TOKEN" \
-               -H "Content-Type: application/json" \
-               --data '{"purge_everything":true}')
-          
-          echo "Cloudflare 响应: $RESPONSE"
-          if echo "$RESPONSE" | grep -q '"success":true'; then
-            echo "✅ Cloudflare 缓存全量清空成功！"
-          else
-            echo "⚠️ 缓存清理可能未完全成功，请检查 Token 权限。"
-          fi
