@@ -1,30 +1,45 @@
-name: Aggregate Hotel IPTV List
+name: IPTV Traffic Speed Test
 
 on:
-  workflow_dispatch:        # 允许手动点击运行
-
+  # 允许在 GitHub Actions 页面手动触发
+  workflow_dispatch:
+  # 定时任务：例如每天凌晨 3:00 执行一次
+  schedule:
+    - cron: '0 3 * * *'
 
 jobs:
-  build:
+  run-speed-test:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Checkout Code
-        uses: actions/checkout@v3
+      # 1. 检出代码仓库
+      - name: Checkout Repository
+        uses: actions/checkout@v4
 
+      # 2. 设置 Python 环境
       - name: Set up Python
-        uses: actions/setup-python@v4
+        uses: actions/setup-python@v5
         with:
           python-version: '3.10'
+          cache: 'pip'
 
-      - name: Run Aggregate Script
+      # 3. 安装脚本依赖
+      - name: Install Dependencies
         run: |
-          python md/test_check.py  # 运行下面为你准备的脚本
+          python -m pip install --upgrade pip
+          pip install requests
 
-      - name: Commit and Push
+      # 4. 执行测速脚本
+      - name: Run Traffic Test Script
+        env:
+          LIVE_WORKSPACE: ${{ github.workspace }}
         run: |
-          git config --local user.email "github-actions[bot]@users.noreply.github.com"
-          git config --local user.name "github-actions[bot]"
-          git add hotel.txt
-          # 只有在文件有变化时才 commit，防止报错
-          git diff --quiet && git diff --staged --quiet || (git commit -m "Update: $(date +'%Y-%m-%d') aggregated hotel list" && git push)
+          python traffic_test.py
+
+      # 5. 自动提交并推送测速报告到仓库
+      - name: Commit and Push Reports
+        run: |
+          git config --global user.name 'github-actions[bot]'
+          git config --global user.email 'github-actions[bot]@users.noreply.github.com'
+          git add md/traffic_report.txt md/traffic_summary.json
+          git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update traffic speed test report [skip ci]" && git push)
