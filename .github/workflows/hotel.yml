@@ -89,14 +89,17 @@ jobs:
           fi
           if [ -f "hotel_output.txt" ]; then
             cp hotel_output.txt private_repo/hotel_output.txt || true
-          fi        
+          fi         
           
           cd private_repo
           
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 🎯 仅对实际产物目录执行 git add
+          # 🎯 核心修复：在提交前先拉取远程私库的最新变动，防止被拒
+          git pull --rebase origin main || true
+          
+          # 仅对实际产物目录执行 git add
           git add hotels/ md/ 2>/dev/null || true
           
           if git diff --staged --quiet; then
