@@ -60,9 +60,17 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           
-          git pull --rebase origin main || true
+          # 1️⃣ 先把本地可能存在的乱七八糟的改动清理或暂存
+          git stash || true
           
-          # 仅把测速生成的报表文件加入暂存区
+          # 2️⃣ 用 fetch + rebase 优雅拉取远程最新变动，防止强制覆盖冲突
+          git fetch origin main
+          git rebase origin/main || git rebase --abort || true
+          
+          # 3️⃣ 弹出刚才 stash 的内容（如果有的话）
+          git stash pop || true
+          
+          # 4️⃣ 仅把测速生成的两个报表文件加入暂存区
           git add md/traffic_report.txt md/traffic_summary.json 2>/dev/null || true
           
           if git diff --staged --quiet; then
@@ -71,4 +79,7 @@ jobs:
           fi
 
           git commit -m "📈 [自动测速] 更新带宽性能与流量报告: $(date +'%Y-%m-%d %H:%M')"
+          
+          # 5️⃣ 推送前再做一次拉取合并，确保万无一失
+          git pull --rebase origin main || true
           git push origin main
