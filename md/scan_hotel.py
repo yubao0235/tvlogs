@@ -57,9 +57,10 @@ def save_realtime(host, channels, tag=""):
         f.write("\n")
     print(f"✨ [{tag}] 已上线: {host}", flush=True)
 
+    
 def run_scan():
     if os.path.exists(RESULT_TXT):
-        os.remove(RESULT_TXT)
+        os.path.remove(RESULT_TXT)
     
     print(f"📂 正在聚合原始基因，目标防区: {HOTEL_DIR}", flush=True)
     if not os.path.exists(HOTEL_DIR):
@@ -74,38 +75,49 @@ def run_scan():
             all_genes[gene['host']] = gene['channels']
 
     final_live_hosts = set()
-    failed_genes = {}
+    
+    # 🎯 改进点 1：不管第一阶段成败，直接提取所有种子对应的“网段 (C段) 与 端口”
+    # 这样可以确保类似 139.214.181.x 的整个网段都会被纳入轰炸区，不会漏掉同网段的可用 IP
+    target_nets = {} # 格式: { "139.214.181:9901": channels, ... }
 
-    print(f"⚡ 阶段 1: 快速检测 {len(all_genes)} 个原始 IP...", flush=True)
+    print(f"⚡ 阶段 1: 快速探测 {len(all_genes)} 个原始 IP 的健康状态...", flush=True)
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
-        future_to_host = {executor.submit(check_url, f"http://{h}{c[0]['path']}"): (h, c) for h, c in all_genes.items()}
+        future_to_host = {
+            executor.submit(check_url, f"http://{h}{c[0]['path']}"): (h, c) 
+            for h, c in all_genes.items()
+        }
         for future in concurrent.futures.as_completed(future_to_host):
             host, channels = future_to_host[future]
             if future.result():
                 save_realtime(host, channels, tag="现成")
                 final_live_hosts.add(host)
-            else:
-                failed_genes[host] = channels
 
-    print(f"\n📡 阶段 2: 启动 C 段深度扫描 (剩余 {len(failed_genes)} 个待处理网段)...", flush=True)
-    processed_nets = set()
+    # 🎯 改进点 2：无论第一阶段命中与否，把所有原始基因的 C 段全部收集起来准备进行全方位扫描
+    for host, channels in all_genes.items():
+        ip_part = host.split(':')[0]
+        ip_pieces = ip_part.split('.')
+        if len(ip_pieces) == 4:
+            prefix = ".".join(ip_pieces[:3]) # 例如 139.214.181
+            port = host.split(':')[1] if ':' in host else "80"
+            net_key = f"{prefix}:{port}"
+            if net_key not in target_nets:
+                target_nets[net_key] = channels
+
+    print(f"\n📡 阶段 2: 启动 C 段全覆盖深度扫描 (共计锁定 {len(target_nets)} 个独特网段，开始 0-255 毯式轰炸)...", flush=True)
+    
     completely_dead_hosts = []
+    processed_nets = set()
 
-    for host, channels in failed_genes.items():
-        ip_parts = host.split(':')[0].split('.')
-        if len(ip_parts) < 4:
-            continue
-        prefix = ".".join(ip_parts[:3])
-        port = host.split(':')[1] if ':' in host else "80"
+    for net_key, channels in target_nets.items():
+        prefix, port = net_key.split(':')
         
         if prefix in processed_nets:
             continue
-        if any(h.startswith(prefix) for h in final_live_hosts):
-            continue
-        
         processed_nets.add(prefix)
-        print(f"🔍 正在扫荡网段: {prefix}.x:{port}...", flush=True)
         
+        print(f"🔍 正在地毯式扫荡网段: {prefix}.1-254 端口 {port}...", flush=True)
+        
+        # 构造该网段从 1 到 254 的所有 IP 组合
         scan_urls = [f"http://{prefix}.{i}:{port}{channels[0]['path']}" for i in range(1, 255)]
         
         net_rescued = False
@@ -116,23 +128,26 @@ def run_scan():
                 if res_url:
                     new_host = urlparse(res_url).netloc
                     if new_host not in final_live_hosts:
-                        save_realtime(new_host, channels, tag="复活")
+                        save_realtime(new_host, channels, tag="网段捕获")
                         final_live_hosts.add(new_host)
                         net_rescued = True
 
+        # 如果整个网段 1-254 全部挂掉，才记录为彻底失效源
         if not net_rescued:
-            completely_dead_hosts.append(host)
+            # 顺便把该网段代表性的 host 记录进去
+            completely_dead_hosts.append(f"{prefix}.x:{port}")
 
+    # 保存失效清单
     os.makedirs(MD_DIR, exist_ok=True)
     with open(DEAD_TXT, "w", encoding="utf-8") as f_dead:
         f_dead.write("# ==========================================\n")
-        f_dead.write("# ❌ 失效/未复活的酒店IP源汇总\n")
+        f_dead.write("# ❌ 全网段扫描后仍无响应的死机网段/IP汇总\n")
         f_dead.write("# ==========================================\n")
-        for dead_host in sorted(completely_dead_hosts):
+        for dead_host in sorted(list(set(completely_dead_hosts))):
             f_dead.write(f"{dead_host}\n")
             
-    print(f"\n✅ 深度扫描结束！结果已写入: {RESULT_TXT}", flush=True)
-    print(f"🗑️ 已失效未复活的源 IP 列表已同步写入: {DEAD_TXT}", flush=True)
+    print(f"\n✅ 智能全网段深度扫描结束！有效大表已生成: {RESULT_TXT}", flush=True)
+    print(f"🗑️ 彻底死机的网段清单已同步写入: {DEAD_TXT}", flush=True)
 
 if __name__ == "__main__":
     run_scan()
