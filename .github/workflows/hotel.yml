@@ -2,7 +2,7 @@ name: Hotel IPTV Daily Refresh (Sanitizer)
 
 on:
   schedule:
-    - cron: '20 */8 * * *'  # 每8 小时全自动洗版测速一次
+    - cron: '20 */8 * * *'  # 每 8 小时全自动洗版与合流一次
   workflow_dispatch:         
 
 concurrency:
@@ -14,18 +14,18 @@ jobs:
     runs-on: ubuntu-latest
 
     steps:
-      # 1️⃣ 检出公开库（仅仅用来作为算力节点和执行容器）
+      # 1️⃣ 检出公开库（作为算力与执行容器）
       - name: Checkout Public Repo (As Runner Context)
         uses: actions/checkout@v4
 
-      # 2️⃣ 跨库检出私库，并强制将其下载到专用的临时防区 `private_repo` 下
+      # 2️⃣ 跨库检出私库，强制将其下载到专用的临时防区 `private_repo` 下
       - name: Checkout Private Data Repo
         uses: actions/checkout@v4
         with:
           repository: ${{ secrets.LIVE_REPO }}
           token: ${{ secrets.LIVE_TOKEN }}  
           fetch-depth: 0
-          path: private_repo  # 🎯 核心隔离点：将私库完全装进这个子文件夹里
+          path: private_repo  
           persist-credentials: true         
 
       - name: Setup Python Environment
@@ -38,7 +38,7 @@ jobs:
           python -m pip install --upgrade pip
           python -m pip install requests tqdm urllib3 aiohttp
 
-      # 3️⃣ 运行爆破扫描（生成最新原始数据）
+      # 3️⃣ 运行爆破扫描（生成最新原始数据到私库根目录）
       - name: Run Real-time Execution Scan
         env:
           PYTHONUNBUFFERED: "1"
@@ -46,7 +46,7 @@ jobs:
         run: |
           python md/scan_hotel.py
 
-      # 4️⃣ 运行智能洗版与全量融合（新老资产在脚本内部自动合流并生成完整的 ALL.m3u）
+      # 4️⃣ 运行智能洗版与全量融合（内部自动全量合并为 ALL.m3u）
       - name: Rebuild and Merge M3U Lists
         env:
           PYTHONUNBUFFERED: "1"
@@ -54,58 +54,26 @@ jobs:
         run: |
           python md/rebuild_m3u.py
 
-      # 5️⃣ 运行多线程流媒体测速（此时读取的是包含所有新老源的完整 ALL.m3u）
-      - name: IPTV Speed Test
-        env:
-          PYTHONUNBUFFERED: "1"
-          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo  # 🎯 传递私库路径
-        run: |
-          if [ -f "md/traffic_test.py" ]; then
-            python md/traffic_test.py
-          else
-            echo "⚠️ 找不到测速脚本，跳过此步"
-          fi
-
-      # 6️⃣ 跨库精准推流：强行同步计算产物到私库（全量无死角追踪）
+      # 5️⃣ 精准推流：安全提交计算产物到私库
       - name: Commit and Push Changes Directly to Private Repo
         run: |
-          echo "🔄 正在强行从公开工作区搬运最新计算产物到私库防区..."
-          
-          mkdir -p private_repo/hotels
-          mkdir -p private_repo/md
-          
-          if [ -d "hotels" ]; then
-            cp -r hotels/* private_repo/hotels/ || true
-          fi
-          
-          if [ -f "md/traffic_report.txt" ]; then
-            cp md/traffic_report.txt private_repo/md/traffic_report.txt || true
-          fi
-          if [ -f "md/traffic_summary.json" ]; then
-            cp md/traffic_summary.json private_repo/md/traffic_summary.json || true
-          fi
-          if [ -f "md/dead_hosts.txt" ]; then
-            cp md/dead_hosts.txt private_repo/md/dead_hosts.txt || true
-          fi
-          if [ -f "hotel_output.txt" ]; then
-            cp hotel_output.txt private_repo/hotel_output.txt || true
-          fi         
+          echo "🔄 正在将最新扫描与洗版产物推送到私库..."
           
           cd private_repo
           
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 🎯 核心修复：在提交前先拉取远程私库的最新变动，防止被拒
+          # 拉取最新变动，防止冲突
           git pull --rebase origin main || true
           
-          # 仅对实际产物目录执行 git add
-          git add hotels/ md/ 2>/dev/null || true
+          # 明确指定添加产物目录，避免遗漏
+          git add hotels/ md/ hotel_output.txt 2>/dev/null || true
           
           if git diff --staged --quiet; then
             echo "✅ 暂存区无实质变动，跳过推送。"
             exit 0
           fi
 
-          git commit -m "📊 [自动更新] 同步最新 IPTV 测速与洗版产物: $(date +'%Y-%m-%d %H:%M')"
+          git commit -m "📊 [自动更新] 同步最新 IPTV 洗版与 ALL.m3u 总表: $(date +'%Y-%m-%d %H:%M')"
           git push origin main
