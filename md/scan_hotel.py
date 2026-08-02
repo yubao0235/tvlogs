@@ -11,12 +11,12 @@ WORKSPACE = os.environ.get("LIVE_WORKSPACE", os.path.dirname(os.path.dirname(os.
 HOTEL_DIR = os.path.join(WORKSPACE, "hotel")          # 指向私库下的 hotel 文件夹
 RESULT_TXT = os.path.join(WORKSPACE, "hotel_output.txt") # 扫描临时大表存放在私库根目录
 
-# 🎯 新增：失效死机源输出路径（存放在 md/ 文件夹下）
+# 失效死机源输出路径（存放在 md/ 文件夹下）
 MD_DIR = os.path.join(WORKSPACE, "md")
 DEAD_TXT = os.path.join(MD_DIR, "dead_hosts.txt")
 # ==========================================================
 
-TIMEOUT = 10 
+TIMEOUT = 3 
 MAX_WORKERS = 150 
 HEADERS = {
     "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
@@ -31,7 +31,6 @@ def check_url(url):
     except Exception as e:
         # 如果你想调试，可以把报错打印出来看看它究竟是因为超时还是被拒绝
         # print(f"DEBUG 报错: {url} -> {e}")
-        return None
         return None
 
 def extract_from_m3u(file_path):
@@ -57,10 +56,10 @@ def save_realtime(host, channels, tag=""):
         f.write("\n")
     print(f"✨ [{tag}] 已上线: {host}", flush=True)
 
-    
 def run_scan():
+    # 🎯 确保使用正确的 os.path.exists 和 os.remove
     if os.path.exists(RESULT_TXT):
-        os.path.remove(RESULT_TXT)
+        os.remove(RESULT_TXT)
     
     print(f"📂 正在聚合原始基因，目标防区: {HOTEL_DIR}", flush=True)
     if not os.path.exists(HOTEL_DIR):
@@ -75,9 +74,6 @@ def run_scan():
             all_genes[gene['host']] = gene['channels']
 
     final_live_hosts = set()
-    
-    # 🎯 改进点 1：不管第一阶段成败，直接提取所有种子对应的“网段 (C段) 与 端口”
-    # 这样可以确保类似 139.214.181.x 的整个网段都会被纳入轰炸区，不会漏掉同网段的可用 IP
     target_nets = {} # 格式: { "139.214.181:9901": channels, ... }
 
     print(f"⚡ 阶段 1: 快速探测 {len(all_genes)} 个原始 IP 的健康状态...", flush=True)
@@ -92,12 +88,12 @@ def run_scan():
                 save_realtime(host, channels, tag="现成")
                 final_live_hosts.add(host)
 
-    # 🎯 改进点 2：无论第一阶段命中与否，把所有原始基因的 C 段全部收集起来准备进行全方位扫描
+    # 无论第一阶段成败，把所有原始基因的 C 段全部收集起来准备进行全方位扫描
     for host, channels in all_genes.items():
         ip_part = host.split(':')[0]
         ip_pieces = ip_part.split('.')
         if len(ip_pieces) == 4:
-            prefix = ".".join(ip_pieces[:3]) # 例如 139.214.181
+            prefix = ".".join(ip_pieces[:3]) 
             port = host.split(':')[1] if ':' in host else "80"
             net_key = f"{prefix}:{port}"
             if net_key not in target_nets:
@@ -117,7 +113,6 @@ def run_scan():
         
         print(f"🔍 正在地毯式扫荡网段: {prefix}.1-254 端口 {port}...", flush=True)
         
-        # 构造该网段从 1 到 254 的所有 IP 组合
         scan_urls = [f"http://{prefix}.{i}:{port}{channels[0]['path']}" for i in range(1, 255)]
         
         net_rescued = False
@@ -132,12 +127,9 @@ def run_scan():
                         final_live_hosts.add(new_host)
                         net_rescued = True
 
-        # 如果整个网段 1-254 全部挂掉，才记录为彻底失效源
         if not net_rescued:
-            # 顺便把该网段代表性的 host 记录进去
             completely_dead_hosts.append(f"{prefix}.x:{port}")
 
-    # 保存失效清单
     os.makedirs(MD_DIR, exist_ok=True)
     with open(DEAD_TXT, "w", encoding="utf-8") as f_dead:
         f_dead.write("# ==========================================\n")
