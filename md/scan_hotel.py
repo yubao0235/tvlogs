@@ -16,7 +16,7 @@ MD_DIR = os.path.join(WORKSPACE, "md")
 DEAD_TXT = os.path.join(MD_DIR, "dead_hosts.txt")
 # ==========================================================
 
-TIMEOUT = 3 
+TIMEOUT = 10 
 MAX_WORKERS = 150 
 HEADERS = {"User-Agent": "Lavf/58.29.100"}
 
