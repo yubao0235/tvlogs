@@ -18,13 +18,20 @@ DEAD_TXT = os.path.join(MD_DIR, "dead_hosts.txt")
 
 TIMEOUT = 10 
 MAX_WORKERS = 150 
-HEADERS = {"User-Agent": "Lavf/58.29.100"}
+HEADERS = {
+    "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36"
+}
 
 def check_url(url):
     try:
-        r = requests.get(url.replace('&amp;', '&'), headers=HEADERS, timeout=TIMEOUT, stream=True)
-        return url if r.status_code in [200, 206] else None
-    except:
+        # 允许自动处理重定向 allow_redirects=True
+        r = requests.get(url.replace('&amp;', '&'), headers=HEADERS, timeout=TIMEOUT, stream=True, allow_redirects=True)
+        # 放宽状态码限制，只要不是明确的 4xx 错误或 5xx 错误，或者属于常见可用状态码
+        return url if r.status_code in [200, 206, 301, 302] else None
+    except Exception as e:
+        # 如果你想调试，可以把报错打印出来看看它究竟是因为超时还是被拒绝
+        # print(f"DEBUG 报错: {url} -> {e}")
+        return None
         return None
 
 def extract_from_m3u(file_path):
