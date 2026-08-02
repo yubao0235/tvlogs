@@ -1,57 +1,74 @@
-name: IPTV Traffic Speed Test
+name: IPTV Traffic Speed Test Only
 
 on:
-  workflow_dispatch:
+  schedule:
+    - cron: '0 */12 * * *'  # 比如每 12 小时测速一次，与主流程错开
+  workflow_dispatch:         
+
+concurrency:
+  group: ${{ github.workflow }}-${{ github.ref }}
+  cancel-in-progress: true
 
 jobs:
-  run-speed-test:
+  speedtest:
     runs-on: ubuntu-latest
 
     steps:
-      # 1. 检出公开库（作为算力节点容器）
-      - name: Checkout Repository
+      # 1️⃣ 检出公开库
+      - name: Checkout Public Repo (As Runner Context)
         uses: actions/checkout@v4
 
-      # 🎯 2. 【新增】跨库检出私库，并将其放入 private_repo 目录
+      # 2️⃣ 跨库检出私库到 `private_repo`
       - name: Checkout Private Data Repo
         uses: actions/checkout@v4
         with:
           repository: ${{ secrets.LIVE_REPO }}
-          token: ${{ secrets.LIVE_TOKEN }}
+          token: ${{ secrets.LIVE_TOKEN }}  
           fetch-depth: 0
-          path: private_repo
-          persist-credentials: true
+          path: private_repo  
+          persist-credentials: true         
 
-      # 3. 设置 Python 环境
-      - name: Set up Python
+      - name: Setup Python Environment
         uses: actions/setup-python@v5
         with:
           python-version: '3.10'
-          cache: 'pip'
 
-      # 4. 安装脚本依赖
-      - name: Install Dependencies
+      - name: Install Compute Dependencies
         run: |
           python -m pip install --upgrade pip
-          pip install requests
+          python -m pip install requests urllib3
 
-      # 5. 执行测速脚本，并将工作区变量指定到私库目录
-      - name: Run Traffic Test Script
+      # 3️⃣ 独立运行测速脚本（读取私库中已经生成的 ALL.m3u 进行带宽测试）
+      - name: Run IPTV Speed Test Pipeline
         env:
-          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo  # 🎯 指向私库防区
+          PYTHONUNBUFFERED: "1"
+          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo  # 🎯 关键：将工作区指向私库内部
         run: |
-          python md/traffic_test.py
-
-      # 6. 自动提交并推送测速报告回到私库（或者按需提交）
-      - name: Commit and Push Reports to Private Repo
-        run: |
-          cd private_repo
-          git config --local user.name 'github-actions[bot]'
-          git config --local user.email 'github-actions[bot]@users.noreply.github.com'
-          
-          if [ -f "md/traffic_report.txt" ] || [ -f "md/traffic_summary.json" ]; then
-            git add md/traffic_report.txt md/traffic_summary.json 2>/dev/null || true
-            git diff --quiet && git diff --staged --quiet || (git commit -m "chore: update traffic speed test report [skip ci]" && git push)
+          if [ -f "private_repo/md/traffic_test.py" ]; then
+            python private_repo/md/traffic_test.py
           else
-            echo "⚠️ 未检测到生成的测速报告文件，跳过提交。"
+            echo "⚠️ 找不到测速脚本，跳过此步"
           fi
+
+      # 4️⃣ 精准推送测速报告到私库
+      - name: Commit and Push Speed Test Report
+        run: |
+          echo "🔄 正在推送最新流量测速报告..."
+          
+          cd private_repo
+          
+          git config --local user.name "github-actions[bot]"
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          
+          git pull --rebase origin main || true
+          
+          # 仅把测速生成的报表文件加入暂存区
+          git add md/traffic_report.txt md/traffic_summary.json 2>/dev/null || true
+          
+          if git diff --staged --quiet; then
+            echo "✅ 测速报告无变动，跳过推送。"
+            exit 0
+          fi
+
+          git commit -m "📈 [自动测速] 更新带宽性能与流量报告: $(date +'%Y-%m-%d %H:%M')"
+          git push origin main
