@@ -16,7 +16,7 @@ TEST_DURATION = 6          # 每个流最大测试持续时间（秒）
 MAX_WORKERS = 10           # 并发线程数
 SAMPLES_PER_IP = 2         # 每个 IP 提取测试的频道样本数
 
-# 路径自适应适配（支持你的 Docker / 环境变量隔离区）
+# 路径自适应适配（在独立测速工作流中，WORKSPACE 直接指向私库根目录）
 WORKSPACE = os.environ.get('LIVE_WORKSPACE') or os.getcwd()
 OUTPUT_TXT = os.path.join(WORKSPACE, "md", "traffic_report.txt")
 OUTPUT_JSON = os.path.join(WORKSPACE, "md", "traffic_summary.json")
@@ -78,15 +78,14 @@ def test_stream_traffic(url, timeout=TEST_DURATION):
 def run_speed_test_pipeline():
     print(f"🚀 开始执行 IPTV 流量测速任务，工作区路径: {WORKSPACE}")
     
-    # 示例：假设我们需要从本地的 ALL.m3u 或缓存文件中解析待测频道
-    # 你可以根据实际的解析逻辑读取目标数据源
+    # 🎯 直接精准定位私库中的 ALL.m3u 总表
     all_m3u_path = os.path.join(WORKSPACE, "hotels", "ALL.m3u")
     
     if not os.path.exists(all_m3u_path):
         print(f"⚠️ 未找到目标播放列表文件: {all_m3u_path}，测速退出。")
         return
 
-    # 简单解析 M3U 获取频道和 URL
+    # 解析 M3U 获取所有频道和 URL
     channels = []
     current_name = ""
     with open(all_m3u_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -146,7 +145,7 @@ def run_speed_test_pipeline():
         else:
             summ["avg_mbps"] = 0.0
 
-    # 保存报告
+    # 保存报告到 md/ 目录下
     os.makedirs(os.path.dirname(OUTPUT_TXT), exist_ok=True)
     
     with open(OUTPUT_TXT, 'w', encoding='utf-8') as f:
