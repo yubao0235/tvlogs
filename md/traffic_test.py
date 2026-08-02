@@ -131,6 +131,9 @@ def run_speed_test_pipeline():
             res = future.result()
             if res:
                 results.append(res)
+                # 🎯 加上这行，实时打印每个测完的 IP 进展，并立刻刷新日志
+                print(f"⚡ [已测完] IP: {res['ip_port']} | 频道: {res['name']} | 平均速度: {res['avg_mbps']} Mbps", flush=True)
+                
                 ip = res['ip_port']
                 if ip not in group_summary:
                     group_summary[ip] = {"alive_count": 0, "total_speed": 0, "max_mbps": 0}
