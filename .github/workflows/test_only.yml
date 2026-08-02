@@ -42,10 +42,11 @@ jobs:
       - name: Run IPTV Speed Test Pipeline
         env:
           PYTHONUNBUFFERED: "1"
-          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo  # 🎯 关键：将工作区指向私库内部
+          LIVE_WORKSPACE: ${{ github.workspace }}/private_repo
         run: |
           if [ -f "private_repo/md/traffic_test.py" ]; then
-            python private_repo/md/traffic_test.py
+            # 🎯 加上 -u 参数，双保险强制 python 实时吐出标准输出日志
+            python -u private_repo/md/traffic_test.py
           else
             echo "⚠️ 找不到测速脚本，跳过此步"
           fi
