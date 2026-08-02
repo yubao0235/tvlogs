@@ -77,16 +77,15 @@ def test_stream_traffic(url, timeout=TEST_DURATION):
 
 def run_speed_test_pipeline():
     print(f"🚀 开始执行 IPTV 流量测速任务，工作区路径: {WORKSPACE}", flush=True)
-    print(f"📦 共解析到 {len(channels)} 个频道，准备开始并发测速...", flush=True)
-    # 示例：假设我们需要从本地的 ALL.m3u 或缓存文件中解析待测频道
-    # 你可以根据实际的解析逻辑读取目标数据源
+    
+    # 1. 定位 ALL.m3u 文件路径
     all_m3u_path = os.path.join(WORKSPACE, "hotels", "ALL.m3u")
     
     if not os.path.exists(all_m3u_path):
-        print(f"⚠️ 未找到目标播放列表文件: {all_m3u_path}，测速退出。")
+        print(f"⚠️ 未找到目标播放列表文件: {all_m3u_path}，测速退出。", flush=True)
         return
 
-    # 简单解析 M3U 获取频道和 URL
+    # 2. 先解析 M3U 获取频道和 URL 列表
     channels = []
     current_name = ""
     with open(all_m3u_path, 'r', encoding='utf-8', errors='ignore') as f:
@@ -101,10 +100,11 @@ def run_speed_test_pipeline():
                 current_name = ""
 
     if not channels:
-        print("⚠️ 没有解析到任何可测试的频道链接。")
+        print("⚠️ 没有解析到任何可测试的频道链接。", flush=True)
         return
 
-    print(f"📦 共解析到 {len(channels)} 个频道，准备开始并发测速...")
+    # 3. 此时 channels 已经有数据了，正常打印总数并带上 flush=True 实时刷新
+    print(f"📦 共解析到 {len(channels)} 个频道，准备开始并发测速...", flush=True)
 
     results = []
     group_summary = {}
@@ -112,7 +112,6 @@ def run_speed_test_pipeline():
     def worker(ch):
         res = test_stream_traffic(ch['url'])
         if res:
-            # 提取 IP:Port 作为网段分组依据
             import urllib.parse
             parsed_url = urllib.parse.urlparse(ch['url'])
             ip_port = parsed_url.netloc or "unknown"
@@ -127,12 +126,16 @@ def run_speed_test_pipeline():
 
     with ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         futures = [executor.submit(worker, ch) for ch in channels]
+        completed_count = 0
+        total_count = len(channels)
+        
         for future in as_completed(futures):
+            completed_count += 1
             res = future.result()
             if res:
                 results.append(res)
-                # 🎯 加上这行，实时打印每个测完的 IP 进展，并立刻刷新日志
-                print(f"⚡ [已测完] IP: {res['ip_port']} | 频道: {res['name']} | 平均速度: {res['avg_mbps']} Mbps", flush=True)
+                # 实时打印每一个测完的频道进展，并在网页上滚动
+                print(f"[{completed_count}/{total_count}] ⚡ [已测完] IP: {res['ip_port']} | 频道: {res['name']} | 平均速度: {res['avg_mbps']} Mbps", flush=True)
                 
                 ip = res['ip_port']
                 if ip not in group_summary:
@@ -162,7 +165,7 @@ def run_speed_test_pipeline():
     with open(OUTPUT_JSON, 'w', encoding='utf-8') as f:
         json.dump({"summary": group_summary, "details": results}, f, ensure_ascii=False, indent=2)
 
-    print(f"✅ 测速完成！成功测试有效频道 {len(results)} 个。报告已保存至 {OUTPUT_TXT} 和 {OUTPUT_JSON}")
+    print(f"✅ 测速完成！成功测试有效频道 {len(results)} 个。报告已保存至 {OUTPUT_TXT} 和 {OUTPUT_JSON}", flush=True)
 
 if __name__ == "__main__":
     run_speed_test_pipeline()
