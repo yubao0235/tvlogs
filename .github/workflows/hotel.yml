@@ -64,10 +64,17 @@ jobs:
           git config --local user.name "github-actions[bot]"
           git config --local user.email "github-actions[bot]@users.noreply.github.com"
           
-          # 拉取最新变动，防止冲突
-          git pull --rebase origin main || true
+          # 1️⃣ 保护现场：清理或暂存本地未提交的杂项更改，防止 rebase 冲突报错
+          git stash || true
           
-          # 明确指定添加产物目录，避免遗漏
+          # 2️⃣ 获取远程最新分支并执行变基同步
+          git fetch origin main
+          git rebase origin/main || git rebase --abort || true
+          
+          # 3️⃣ 恢复刚才暂存的内容
+          git stash pop || true
+          
+          # 4️⃣ 精准添加目标产物目录
           git add hotels/ md/ hotel_output.txt 2>/dev/null || true
           
           if git diff --staged --quiet; then
@@ -76,4 +83,7 @@ jobs:
           fi
 
           git commit -m "📊 [自动更新] 同步最新 IPTV 洗版与 ALL.m3u 总表: $(date +'%Y-%m-%d %H:%M')"
+          
+          # 5️⃣ 推送前再做一次重试拉取，确保万无一失
+          git pull --rebase origin main || true
           git push origin main
