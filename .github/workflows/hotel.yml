@@ -2,7 +2,7 @@ name: Hotel IPTV Daily Refresh (Sanitizer)
 
 on:
   schedule:
-    - cron: '20 */8 * * *'  # 每 8 小时全自动洗版与合流一次
+    - cron: '0 */8 * * *'  # 每 8 小时全自动洗版与合流一次
   workflow_dispatch:         
 
 concurrency:
