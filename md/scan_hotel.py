@@ -59,7 +59,6 @@ def load_dead_hosts():
         with open(DEAD_TXT, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
-                # 过滤注释行和空行
                 if line and not line.startswith("#"):
                     dead_set.add(line)
         print(f"🛡️ 成功加载历史死机黑名单，共计屏蔽 {len(dead_set)} 个失效网段/IP。", flush=True)
@@ -110,22 +109,28 @@ def run_scan():
             if net_key not in target_nets:
                 target_nets[net_key] = channels
 
-    print(f"\n📡 阶段 2: 启动 C 段全覆盖深度扫描...", flush=True)
-    
-    current_scan_dead_hosts = []
+    # 📊 预先计算并过滤出真正需要扫描的网段清单
+    valid_scan_nets = []
+    skipped_count = 0
     processed_nets = set()
 
     for net_key, channels in target_nets.items():
-        prefix, port = net_key.split(':')
-        
         if net_key in processed_nets:
             continue
         processed_nets.add(net_key)
 
-        # 🚀 核心优化：如果该网段在历史黑名单中，直接跳过不扫描！
         if net_key in historical_dead_nets:
-            print(f"⏩ 命中历史死机黑名单，跳过扫描网段: {prefix}.x 端口 {port}", flush=True)
+            skipped_count += 1
             continue
+        valid_scan_nets.append((net_key, channels))
+
+    print(f"\n📡 阶段 2: 启动 C 段全覆盖深度扫描...", flush=True)
+    print(f"📈 统计面板 -> 原始归并网段: {len(target_nets)} 个 | 命中黑名单跳过: {skipped_count} 个 | 🚀 实际待深度扫描网段: {len(valid_scan_nets)} 个", flush=True)
+
+    current_scan_dead_hosts = []
+
+    for net_key, channels in valid_scan_nets:
+        prefix, port = net_key.split(':')
         
         print(f"🔍 正在地毯式扫荡网段: {prefix}.1-254 端口 {port}...", flush=True)
         
@@ -144,10 +149,9 @@ def run_scan():
                         net_rescued = True
 
         if not net_rescued:
-            # 记录本次扫描确认死机的网段
             current_scan_dead_hosts.append(net_key)
 
-    # 3. 更新并保存最新的黑名单（合并历史黑名单与本次新死机的网段）
+    # 3. 更新并保存最新的黑名单
     os.makedirs(MD_DIR, exist_ok=True)
     all_dead_set = historical_dead_nets.union(set(current_scan_dead_hosts))
     
