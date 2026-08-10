@@ -53,15 +53,17 @@ def save_realtime(host, channels, tag=""):
     print(f"✨ [{tag}] 已上线: {host}", flush=True)
 
 def load_dead_hosts():
-    """读取历史死机网段/IP黑名单"""
+    """读取历史死机黑名单，完美兼容形如 1.192.12.x:9901 的格式"""
     dead_set = set()
     if os.path.exists(DEAD_TXT):
         with open(DEAD_TXT, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith("#"):
-                    dead_set.add(line)
-        print(f"🛡️ 成功加载历史死机黑名单，共计屏蔽 {len(dead_set)} 个失效网段/IP。", flush=True)
+                    # 将类似 "1.192.12.x:9901" 统一规范化转换为 "1.192.12:9901" 存入集合
+                    normalized_line = line.replace(".x", "")
+                    dead_set.add(normalized_line)
+        print(f"🛡️ 成功加载历史死机黑名单，共计载入并规范化 {len(dead_set)} 条记录。", flush=True)
     return dead_set
 
 def run_scan():
@@ -74,7 +76,7 @@ def run_scan():
         sys.exit(1)
 
     # 1. 优先加载历史死机黑名单
-    historical_dead_nets = load_dead_hosts()
+    historical_dead_sets = load_dead_hosts()
 
     all_genes = {}
     m3u_files = [f for f in os.listdir(HOTEL_DIR) if f.lower().endswith(".m3u")]
@@ -109,7 +111,7 @@ def run_scan():
             if net_key not in target_nets:
                 target_nets[net_key] = channels
 
-    # 📊 预先计算并过滤出真正需要扫描的网段清单
+    # 📊 预先计算并过滤
     valid_scan_nets = []
     skipped_count = 0
     processed_nets = set()
@@ -119,13 +121,15 @@ def run_scan():
             continue
         processed_nets.add(net_key)
 
-        if net_key in historical_dead_nets:
+        # 直接比对规范化后的 net_key（例如 "1.192.12:9901"）
+        if net_key in historical_dead_sets:
             skipped_count += 1
             continue
+            
         valid_scan_nets.append((net_key, channels))
 
     print(f"\n📡 阶段 2: 启动 C 段全覆盖深度扫描...", flush=True)
-    print(f"📈 统计面板 -> 原始归并网段: {len(target_nets)} 个 | 命中黑名单跳过: {skipped_count} 个 | 🚀 实际待深度扫描网段: {len(valid_scan_nets)} 个", flush=True)
+    print(f"📈 统计面板 -> 原始归并网段: {len(target_nets)} 个 | 🛡️ 命中黑名单跳过: {skipped_count} 个 | 🚀 实际待深度扫描网段: {len(valid_scan_nets)} 个", flush=True)
 
     current_scan_dead_hosts = []
 
@@ -151,15 +155,22 @@ def run_scan():
         if not net_rescued:
             current_scan_dead_hosts.append(net_key)
 
-    # 3. 更新并保存最新的黑名单
+    # 3. 更新并保存最新的黑名单（保存时保持你习惯的规范格式：带 .x 的清晰可读格式）
     os.makedirs(MD_DIR, exist_ok=True)
-    all_dead_set = historical_dead_nets.union(set(current_scan_dead_hosts))
+    
+    # 将当前的死机网段转回带 .x 的格式加入集合
+    formatted_current_deads = {f"{k.split(':')[0]}.x:{k.split(':')[1]}" for k in current_scan_dead_hosts}
+    all_dead_set = historical_dead_sets.union(formatted_current_deads)
     
     with open(DEAD_TXT, "w", encoding="utf-8") as f_dead:
         f_dead.write("# ==========================================\n")
         f_dead.write("# ❌ 全网段扫描后仍无响应的死机网段/IP汇总\n")
         f_dead.write("# ==========================================\n")
         for dead_host in sorted(list(all_dead_set)):
+            # 确保写进文件的格式统一美观：1.192.12.x:9901
+            if ".x:" not in dead_host and ":" in dead_host:
+                parts = dead_host.split(':')
+                dead_host = f"{parts[0]}.x:{parts[1]}"
             f_dead.write(f"{dead_host}\n")
             
     print(f"\n✅ 智能全网段深度扫描结束！有效大表已生成: {RESULT_TXT}", flush=True)
