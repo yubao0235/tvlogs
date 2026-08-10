@@ -8,7 +8,7 @@ from urllib.parse import urlparse
 # ================= ⚡ 跨库核心动态路径锁定 =================
 WORKSPACE = os.environ.get("LIVE_WORKSPACE", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-HOTEL_DIR = os.path.join(WORKSPACE, "hotel")          # 指向私库下的 hotel 文件夹
+HOTEL_DIR = os.path.join(WORKSPACE, "hotel")         # 指向私库下的 hotel 文件夹
 RESULT_TXT = os.path.join(WORKSPACE, "hotel_output.txt") # 扫描临时大表存放在私库根目录
 
 # 失效死机源输出路径（存放在 md/ 文件夹下）
@@ -26,11 +26,8 @@ def check_url(url):
     try:
         # 允许自动处理重定向 allow_redirects=True
         r = requests.get(url.replace('&amp;', '&'), headers=HEADERS, timeout=TIMEOUT, stream=True, allow_redirects=True)
-        # 放宽状态码限制，只要不是明确的 4xx 错误或 5xx 错误，或者属于常见可用状态码
         return url if r.status_code in [200, 206, 301, 302] else None
     except Exception as e:
-        # 如果你想调试，可以把报错打印出来看看它究竟是因为超时还是被拒绝
-        # print(f"DEBUG 报错: {url} -> {e}")
         return None
 
 def extract_from_m3u(file_path):
@@ -57,10 +54,9 @@ def save_realtime(host, channels, tag=""):
     print(f"✨ [{tag}] 已上线: {host}", flush=True)
 
 def run_scan():
-    # 🎯 确保使用正确的 os.path.exists 和 os.remove
     if os.path.exists(RESULT_TXT):
         os.remove(RESULT_TXT)
-    
+     
     print(f"📂 正在聚合原始基因，目标防区: {HOTEL_DIR}", flush=True)
     if not os.path.exists(HOTEL_DIR):
         print(f"❌ 致命错误: 找不到原始种子目录 {HOTEL_DIR}", flush=True)
@@ -88,7 +84,7 @@ def run_scan():
                 save_realtime(host, channels, tag="现成")
                 final_live_hosts.add(host)
 
-    # 无论第一阶段成败，把所有原始基因的 C 段全部收集起来准备进行全方位扫描
+    # 按照 IP 前三位（C段）和端口精准归类合并
     for host, channels in all_genes.items():
         ip_part = host.split(':')[0]
         ip_pieces = ip_part.split('.')
@@ -96,10 +92,11 @@ def run_scan():
             prefix = ".".join(ip_pieces[:3]) 
             port = host.split(':')[1] if ':' in host else "80"
             net_key = f"{prefix}:{port}"
+            # 如果同一个 C段+端口 有多个源，优先保留或覆盖
             if net_key not in target_nets:
                 target_nets[net_key] = channels
 
-    print(f"\n📡 阶段 2: 启动 C 段全覆盖深度扫描 (共计锁定 {len(target_nets)} 个独特网段，开始 0-255 毯式轰炸)...", flush=True)
+    print(f"\n📡 阶段 2: 启动 C 段全覆盖深度扫描 (按 C段+端口 归并后共计锁定 {len(target_nets)} 个独立网段任务)...", flush=True)
     
     completely_dead_hosts = []
     processed_nets = set()
@@ -107,9 +104,10 @@ def run_scan():
     for net_key, channels in target_nets.items():
         prefix, port = net_key.split(':')
         
-        if prefix in processed_nets:
+        # 修复 Bug：使用完整的 net_key 确保不同端口的同C段能够被分别扫描
+        if net_key in processed_nets:
             continue
-        processed_nets.add(prefix)
+        processed_nets.add(net_key)
         
         print(f"🔍 正在地毯式扫荡网段: {prefix}.1-254 端口 {port}...", flush=True)
         
@@ -128,7 +126,7 @@ def run_scan():
                         net_rescued = True
 
         if not net_rescued:
-            completely_dead_hosts.append(f"{prefix}.x:{port}")
+            completely_dead_hosts.append(net_key)
 
     os.makedirs(MD_DIR, exist_ok=True)
     with open(DEAD_TXT, "w", encoding="utf-8") as f_dead:
