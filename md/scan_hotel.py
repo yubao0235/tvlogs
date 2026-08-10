@@ -24,7 +24,6 @@ HEADERS = {
 
 def check_url(url):
     try:
-        # 允许自动处理重定向 allow_redirects=True
         r = requests.get(url.replace('&amp;', '&'), headers=HEADERS, timeout=TIMEOUT, stream=True, allow_redirects=True)
         return url if r.status_code in [200, 206, 301, 302] else None
     except Exception as e:
@@ -53,6 +52,19 @@ def save_realtime(host, channels, tag=""):
         f.write("\n")
     print(f"✨ [{tag}] 已上线: {host}", flush=True)
 
+def load_dead_hosts():
+    """读取历史死机网段/IP黑名单"""
+    dead_set = set()
+    if os.path.exists(DEAD_TXT):
+        with open(DEAD_TXT, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                # 过滤注释行和空行
+                if line and not line.startswith("#"):
+                    dead_set.add(line)
+        print(f"🛡️ 成功加载历史死机黑名单，共计屏蔽 {len(dead_set)} 个失效网段/IP。", flush=True)
+    return dead_set
+
 def run_scan():
     if os.path.exists(RESULT_TXT):
         os.remove(RESULT_TXT)
@@ -62,6 +74,9 @@ def run_scan():
         print(f"❌ 致命错误: 找不到原始种子目录 {HOTEL_DIR}", flush=True)
         sys.exit(1)
 
+    # 1. 优先加载历史死机黑名单
+    historical_dead_nets = load_dead_hosts()
+
     all_genes = {}
     m3u_files = [f for f in os.listdir(HOTEL_DIR) if f.lower().endswith(".m3u")]
     for f in m3u_files:
@@ -70,7 +85,7 @@ def run_scan():
             all_genes[gene['host']] = gene['channels']
 
     final_live_hosts = set()
-    target_nets = {} # 格式: { "139.214.181:9901": channels, ... }
+    target_nets = {} 
 
     print(f"⚡ 阶段 1: 快速探测 {len(all_genes)} 个原始 IP 的健康状态...", flush=True)
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -92,22 +107,25 @@ def run_scan():
             prefix = ".".join(ip_pieces[:3]) 
             port = host.split(':')[1] if ':' in host else "80"
             net_key = f"{prefix}:{port}"
-            # 如果同一个 C段+端口 有多个源，优先保留或覆盖
             if net_key not in target_nets:
                 target_nets[net_key] = channels
 
-    print(f"\n📡 阶段 2: 启动 C 段全覆盖深度扫描 (按 C段+端口 归并后共计锁定 {len(target_nets)} 个独立网段任务)...", flush=True)
+    print(f"\n📡 阶段 2: 启动 C 段全覆盖深度扫描...", flush=True)
     
-    completely_dead_hosts = []
+    current_scan_dead_hosts = []
     processed_nets = set()
 
     for net_key, channels in target_nets.items():
         prefix, port = net_key.split(':')
         
-        # 修复 Bug：使用完整的 net_key 确保不同端口的同C段能够被分别扫描
         if net_key in processed_nets:
             continue
         processed_nets.add(net_key)
+
+        # 🚀 核心优化：如果该网段在历史黑名单中，直接跳过不扫描！
+        if net_key in historical_dead_nets:
+            print(f"⏩ 命中历史死机黑名单，跳过扫描网段: {prefix}.x 端口 {port}", flush=True)
+            continue
         
         print(f"🔍 正在地毯式扫荡网段: {prefix}.1-254 端口 {port}...", flush=True)
         
@@ -126,18 +144,22 @@ def run_scan():
                         net_rescued = True
 
         if not net_rescued:
-            completely_dead_hosts.append(net_key)
+            # 记录本次扫描确认死机的网段
+            current_scan_dead_hosts.append(net_key)
 
+    # 3. 更新并保存最新的黑名单（合并历史黑名单与本次新死机的网段）
     os.makedirs(MD_DIR, exist_ok=True)
+    all_dead_set = historical_dead_nets.union(set(current_scan_dead_hosts))
+    
     with open(DEAD_TXT, "w", encoding="utf-8") as f_dead:
         f_dead.write("# ==========================================\n")
         f_dead.write("# ❌ 全网段扫描后仍无响应的死机网段/IP汇总\n")
         f_dead.write("# ==========================================\n")
-        for dead_host in sorted(list(set(completely_dead_hosts))):
+        for dead_host in sorted(list(all_dead_set)):
             f_dead.write(f"{dead_host}\n")
             
     print(f"\n✅ 智能全网段深度扫描结束！有效大表已生成: {RESULT_TXT}", flush=True)
-    print(f"🗑️ 彻底死机的网段清单已同步写入: {DEAD_TXT}", flush=True)
+    print(f"🗑️ 死机黑名单已更新合并，共计记录: {len(all_dead_set)} 个死机网段 -> 存放在: {DEAD_TXT}", flush=True)
 
 if __name__ == "__main__":
     run_scan()
