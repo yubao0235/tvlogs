@@ -11,7 +11,7 @@ LOGO_BASE_URL = "https://tb.yubo.qzz.io/logo/"
 # ==========================================================
 
 def clean_channel_name(name):
-    name = re.sub(r'(高清|标清|普清|超高清|H\.265|4K|HD|SD|hd|sd)', '', name, flags=re.I)
+    name = re.sub(r'(标清|普清|超高清|H\.265|4K|HD|SD|hd|sd)', '', name, flags=re.I)
     name = re.sub(r'[\(\)\[\]\-\s]+', '', name)
     return name.strip()
 
