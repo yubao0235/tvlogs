@@ -138,7 +138,10 @@ def run_scan():
         tag = data['tag']
         channels = data['channels']
         
-        print(f"🔍 正在地毯式扫荡网段 ({tag}): {prefix}.1-254 端口 {port}...", flush=True)
+        # 🎯 核心优化：自动将标签里的具体IP段替换为通配符 120.196.235.*
+        clean_display_tag = re.sub(r'\d+\.\d+\.\d+\.\d+', f'{prefix}.*', tag)
+        
+        print(f"🔍 正在地毯式扫荡网段: {clean_display_tag} (端口 {port})...", flush=True)
         
         scan_urls = [f"http://{prefix}.{i}:{port}{channels[0]['path']}" for i in range(1, 255)]
         
@@ -150,7 +153,7 @@ def run_scan():
                 if res_url:
                     new_host = urlparse(res_url).netloc
                     if new_host not in final_live_hosts:
-                        save_realtime(tag, new_host, channels)
+                        save_realtime(tag, new_host, channels) # 保存时使用原文件名
                         final_live_hosts.add(new_host)
                         net_rescued = True
 
