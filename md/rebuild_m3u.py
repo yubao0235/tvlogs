@@ -1,5 +1,4 @@
 import os
-import shutil
 import re
 
 # ================= ⚡ 跨库核心动态路径锁定 =================
@@ -20,7 +19,6 @@ def rebuild():
         print(f"⚠️ 找不到输入文件: {HOTEL_OUTPUT}")
         return
         
-    # 确保目标目录存在，但不使用 rmtree 粗暴清空，以保护历史资产
     if not os.path.exists(REBORN_DIR):
         os.makedirs(REBORN_DIR)
 
@@ -28,32 +26,37 @@ def rebuild():
     with open(HOTEL_OUTPUT, "r", encoding="utf-8") as f:
         content = f.read().strip().split("\n\n")
 
-    # 记录本次新生成的REBORN文件名前缀，用于后续精准更新
-    new_reborn_files = set()
-
     for section in content:
         lines = section.strip().split("\n")
         if not lines: continue
-        host = lines[0].split(",")[0]
-        safe_host = host.replace('.', '_').replace(':', '_')
-        file_name = f"REBORN_{safe_host}.m3u"
-        new_reborn_files.add(file_name)
+        
+        # 解析第一行的 "原文件名|IP, #genre#" 格式
+        header_line = lines[0].split(",")[0]
+        if "|" in header_line:
+            file_tag, host = header_line.split("|", 1)
+        else:
+            file_tag = header_line.replace('.', '_').replace(':', '_')
+            host = header_line
+            
+        # 🎯 完美直接使用原文件名作为输出文件名！
+        file_name = f"{file_tag}.m3u"
         
         single_m3u = ["#EXTM3U"]
         for cl in lines[1:]:
             if "," in cl:
                 name, url = cl.split(",", 1)
                 clean_n = clean_channel_name(name)
-                header = f'#EXTINF:-1 tvg-name="{clean_n}" tvg-logo="{LOGO_BASE_URL}{clean_n}.png" group-title="Hotel_{host}",{clean_n}'
+                # 分组名称也直接用原文件名（或原文件里的地域信息）
+                header = f'#EXTINF:-1 tvg-name="{clean_n}" tvg-logo="{LOGO_BASE_URL}{clean_n}.png" group-title="{file_tag}",{clean_n}'
                 single_m3u.extend([header, url])
         
-        # 写入本次新扫描出的单体 m3u 文件
+        # 写入与输入源完全同名的 m3u 文件
         with open(os.path.join(REBORN_DIR, file_name), "w", encoding="utf-8") as f_out:
             f_out.write("\n".join(single_m3u))
 
-    # 2. 🌟 核心升级：智能合流与聚合（新资产 + 未本次更新的历史老资产）
+    # 2. 智能合流与聚合（新资产 + 未本次更新的历史老资产）
     all_m3u = ["#EXTM3U"]
-    processed_urls = set() # 用于总表去重
+    processed_urls = set()
 
     print("🔄 正在聚合目录下的所有新老 M3U 资产...")
     for filename in os.listdir(REBORN_DIR):
