@@ -14,7 +14,7 @@ RESULT_TXT = os.path.join(WORKSPACE, "hotel_output.txt") # 扫描临时大表存
 # 黑白名单输出路径（存放在 md/ 文件夹下）
 MD_DIR = os.path.join(WORKSPACE, "md")
 DEAD_TXT = os.path.join(MD_DIR, "dead_hosts.txt")
-WHITE_TXT = os.path.join(MD_DIR, "white_hosts.txt")    # 🌟 新增：活跃网段白名单
+WHITE_TXT = os.path.join(MD_DIR, "white_hosts.txt")    # 🌟 活跃网段白名单
 # ==========================================================
 
 TIMEOUT = 3 
@@ -67,30 +67,32 @@ def load_dead_hosts():
                     normalized_line = line.replace(".x", "")
                     dead_set.add(normalized_line)
         print(f"🛡️ 成功加载历史死机黑名单，共计载入 {len(dead_set)} 条记录。", flush=True)
+    else:
+        print(f"ℹ️ 未发现黑名单文件 {DEAD_TXT}，本次将全新初始化。", flush=True)
     return dead_set
 
 def load_white_hosts():
-    """加载历史成功的白名单网段（如 111.8.242.*:9999）"""
-    white_nets = {} # key: net_key (111.8.242:9999), value: 模板数据
+    """加载历史成功的白名单网段（如 1.196.157.*:999）"""
+    white_nets = {} # key: net_key (1.196.157:999), value: 原始内容行
     if os.path.exists(WHITE_TXT):
         with open(WHITE_TXT, "r", encoding="utf-8") as f:
             for line in f:
                 line = line.strip()
                 if line and not line.startswith("#"):
-                    # line 格式形如 111.8.242.*:9999
                     parts = line.split(":")
                     if len(parts) == 2:
-                        net_prefix = parts[0].replace(".*", "") # 变成 111.8.242
+                        net_prefix = parts[0].replace(".*", "") # 变成 1.196.157
                         port = parts[1]
                         net_key = f"{net_prefix}:{port}"
                         white_nets[net_key] = line
         print(f"🌟 成功加载历史活跃白名单网段，共计载入 {len(white_nets)} 个。", flush=True)
+    else:
+        print(f"ℹ️ 未发现白名单文件 {WHITE_TXT}，将在本次扫描结束后自动生成。", flush=True)
     return white_nets
 
 def save_white_hosts(all_live_hosts):
     """把本次扫描成功出过结果的网段归纳并沉淀到 white_hosts.txt"""
     white_set = set()
-    # 先把旧的读进来
     if os.path.exists(WHITE_TXT):
         with open(WHITE_TXT, "r", encoding="utf-8") as f:
             for line in f:
@@ -98,7 +100,6 @@ def save_white_hosts(all_live_hosts):
                 if line and not line.startswith("#"):
                     white_set.add(line)
                     
-    # 把本次新活着的 host 转化成 C 段通配符加进去
     for host in all_live_hosts:
         ip_part, port = host.split(':')
         ip_pieces = ip_part.split('.')
@@ -136,37 +137,35 @@ def run_scan():
             all_genes[gene['host']] = {"tag": gene['tag'], "channels": gene['channels']}
 
     final_live_hosts = set()
-    target_nets = {} # key: net_key (111.8.242:9999), value: data
+    target_nets = {} # key: net_key (1.196.157:999), value: data
 
-    # 2. 先把 m3u 里的网段收录进待扫池
+    # 2. 🌟 优先注入白名单网段（确保白名单内的网段强行加入待扫池）
+    for net_key, white_line in historical_white_nets.items():
+        prefix, port = net_key.split(':')
+        sample_channel_path = "/iptv/live/1000.m3u"
+        sample_tag = f"白名单网段_{prefix}.*"
+        # 尝试在现有基因中找一个同端口的频道路径作为爆破模版
+        for h, d in all_genes.items():
+            if h.endswith(f":{port}"):
+                sample_channel_path = d['channels'][0]['path']
+                sample_tag = d['tag']
+                break
+        target_nets[net_key] = {
+            "tag": sample_tag,
+            "channels": [{"path": sample_channel_path}]
+        }
+
+    # 3. 再把 m3u 里的网段收录/合并进待扫池（m3u 实时性更高，可覆盖或扩充）
     for host, data in all_genes.items():
-        ip_part = host.split(':')[0]
-        ip_pieces = ip_part.split('.')
+        ip_part = host.split(':')
+        ip_pieces = ip_part[0].split('.')
         if len(ip_pieces) == 4:
             prefix = ".".join(ip_pieces[:3])
-            port = host.split(':')[1] if ':' in host else "80"
+            port = ip_part[1] if len(ip_part) > 1 else "80"
             net_key = f"{prefix}:{port}"
-            if net_key not in target_nets:
-                target_nets[net_key] = data
+            target_nets[net_key] = data
 
-    # 3. 🌟 关键增强：把历史白名单里的网段也强行注入待扫池（即使本地 m3u 过期或丢失，也能继续由白名单复活）
-    for net_key, white_line in historical_white_nets.items():
-        if net_key not in target_nets:
-            prefix, port = net_key.split(':')
-            # 尝试在现有基因中找一个同端口的频道路径作为爆破模版，若没有则用默认兜底
-            sample_channel_path = "/iptv/live/1000.m3u"
-            sample_tag = f"白名单网段_{prefix}.*"
-            for h, d in all_genes.items():
-                if h.endswith(f":{port}"):
-                    sample_channel_path = d['channels'][0]['path']
-                    sample_tag = d['tag']
-                    break
-            target_nets[net_key] = {
-                "tag": sample_tag,
-                "channels": [{"path": sample_channel_path}]
-            }
-
-    print(f"⚡ 阶段 1: 快速探测 {len(all_genes)} 个原始 IP 的健康状态...", flush=True)
+    print(f"⚡ 阶段 1: 快速探测原始基因库健康状态...", flush=True)
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
         future_to_host = {
             executor.submit(check_url, f"http://{h}{data['channels'][0]['path']}"): (h, data) 
@@ -178,7 +177,7 @@ def run_scan():
                 save_realtime(data['tag'], host, data['channels'])
                 final_live_hosts.add(host)
 
-    # 4. 过滤黑名单，编排最终待深度扫描的网段
+    # 4. 过滤黑名单，编排最终待深度扫描的网段（🌟 引入白名单绝对豁免机制）
     valid_scan_nets = []
     skipped_count = 0
     processed_nets = set()
@@ -188,6 +187,12 @@ def run_scan():
             continue
         processed_nets.add(net_key)
 
+        # 🌟 核心豁免：如果该网段在历史白名单中，特赦放行，绝不因黑名单被拦截！
+        if net_key in historical_white_nets:
+            valid_scan_nets.append((net_key, data))
+            continue
+
+        # 不在白名单中的普通网段，才走死机黑名单拦截
         if net_key in historical_dead_sets:
             skipped_count += 1
             continue
@@ -239,7 +244,7 @@ def run_scan():
                 dead_host = f"{parts[0]}.x:{parts[1]}"
             f_dead.write(f"{dead_host}\n")
 
-    # 6. 🌟 核心沉淀：把本次所有活着的 IP 自动提炼并追加写入白名单 white_hosts.txt
+    # 6. 自动提炼并滚动更新白名单 white_hosts.txt
     save_white_hosts(final_live_hosts)
             
     print(f"\n✅ 智能全网段深度扫描结束！有效大表已生成: {RESULT_TXT}", flush=True)
