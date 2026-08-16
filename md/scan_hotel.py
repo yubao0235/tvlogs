@@ -8,12 +8,13 @@ from urllib.parse import urlparse
 # ================= ⚡ 跨库核心动态路径锁定 =================
 WORKSPACE = os.environ.get("LIVE_WORKSPACE", os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
-HOTEL_DIR = os.path.join(WORKSPACE, "hotel")         # 指向私库下的 hotel 文件夹
+HOTEL_DIR = os.path.join(WORKSPACE, "hotel")          # 指向私库下的 hotel 文件夹
 RESULT_TXT = os.path.join(WORKSPACE, "hotel_output.txt") # 扫描临时大表存放在私库根目录
 
-# 失效死机源输出路径（存放在 md/ 文件夹下）
+# 黑白名单输出路径（存放在 md/ 文件夹下）
 MD_DIR = os.path.join(WORKSPACE, "md")
 DEAD_TXT = os.path.join(MD_DIR, "dead_hosts.txt")
+WHITE_TXT = os.path.join(MD_DIR, "white_hosts.txt")    # 🌟 新增：活跃网段白名单
 # ==========================================================
 
 TIMEOUT = 3 
@@ -30,9 +31,9 @@ def check_url(url):
         return None
 
 def extract_from_m3u(file_path):
-    """提取 M3U 内容，并顺便把原文件名（如 吉林长春_139.214.178.118_9901）作为核心标签返回"""
+    """提取 M3U 内容，并顺便把原文件名作为核心标签返回"""
     filename = os.path.basename(file_path)
-    tag = os.path.splitext(filename)[0] # 去掉 .m3u 后缀，完美保留原文件名
+    tag = os.path.splitext(filename)[0]
     
     with open(file_path, "r", encoding="utf-8", errors="ignore") as f:
         content = f.read()
@@ -49,7 +50,6 @@ def extract_from_m3u(file_path):
     return {"tag": tag, "host": host, "channels": channels}
 
 def save_realtime(tag, host, channels):
-    """写入大表时，格式升级为: 标签名|主机IP|频道列表... 方便下游直接读取文件名"""
     with open(RESULT_TXT, "a", encoding="utf-8") as f:
         f.write(f"{tag}|{host},#genre#\n")
         for c in channels:
@@ -66,12 +66,57 @@ def load_dead_hosts():
                 if line and not line.startswith("#"):
                     normalized_line = line.replace(".x", "")
                     dead_set.add(normalized_line)
-        print(f"🛡️ 成功加载历史死机黑名单，共计载入并规范化 {len(dead_set)} 条记录。", flush=True)
+        print(f"🛡️ 成功加载历史死机黑名单，共计载入 {len(dead_set)} 条记录。", flush=True)
     return dead_set
+
+def load_white_hosts():
+    """加载历史成功的白名单网段（如 111.8.242.*:9999）"""
+    white_nets = {} # key: net_key (111.8.242:9999), value: 模板数据
+    if os.path.exists(WHITE_TXT):
+        with open(WHITE_TXT, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    # line 格式形如 111.8.242.*:9999
+                    parts = line.split(":")
+                    if len(parts) == 2:
+                        net_prefix = parts[0].replace(".*", "") # 变成 111.8.242
+                        port = parts[1]
+                        net_key = f"{net_prefix}:{port}"
+                        white_nets[net_key] = line
+        print(f"🌟 成功加载历史活跃白名单网段，共计载入 {len(white_nets)} 个。", flush=True)
+    return white_nets
+
+def save_white_hosts(all_live_hosts):
+    """把本次扫描成功出过结果的网段归纳并沉淀到 white_hosts.txt"""
+    white_set = set()
+    # 先把旧的读进来
+    if os.path.exists(WHITE_TXT):
+        with open(WHITE_TXT, "r", encoding="utf-8") as f:
+            for line in f:
+                line = line.strip()
+                if line and not line.startswith("#"):
+                    white_set.add(line)
+                    
+    # 把本次新活着的 host 转化成 C 段通配符加进去
+    for host in all_live_hosts:
+        ip_part, port = host.split(':')
+        ip_pieces = ip_part.split('.')
+        if len(ip_pieces) == 4:
+            c_prefix = ".".join(ip_pieces[:3])
+            white_set.add(f"{c_prefix}.*:{port}")
+            
+    os.makedirs(MD_DIR, exist_ok=True)
+    with open(WHITE_TXT, "w", encoding="utf-8") as f:
+        f.write("# ==========================================\n")
+        f.write("# 🌟 历史验证有效的酒店 IPTV 活跃网段白名单\n")
+        f.write("# ==========================================\n")
+        for w in sorted(list(white_set)):
+            f.write(f"{w}\n")
 
 def run_scan():
     if os.path.exists(RESULT_TXT):
-        os.path.exists(RESULT_TXT) and os.remove(RESULT_TXT)
+        os.remove(RESULT_TXT)
      
     print(f"📂 正在聚合原始基因，目标防区: {HOTEL_DIR}", flush=True)
     if not os.path.exists(HOTEL_DIR):
@@ -79,8 +124,11 @@ def run_scan():
         sys.exit(1)
 
     historical_dead_sets = load_dead_hosts()
+    historical_white_nets = load_white_hosts()
 
     all_genes = {} # key: host, value: {"tag": tag, "channels": channels}
+    
+    # 1. 从 m3u 文件加载基因
     m3u_files = [f for f in os.listdir(HOTEL_DIR) if f.lower().endswith(".m3u")]
     for f in m3u_files:
         gene = extract_from_m3u(os.path.join(HOTEL_DIR, f))
@@ -88,7 +136,35 @@ def run_scan():
             all_genes[gene['host']] = {"tag": gene['tag'], "channels": gene['channels']}
 
     final_live_hosts = set()
-    target_nets = {} 
+    target_nets = {} # key: net_key (111.8.242:9999), value: data
+
+    # 2. 先把 m3u 里的网段收录进待扫池
+    for host, data in all_genes.items():
+        ip_part = host.split(':')[0]
+        ip_pieces = ip_part.split('.')
+        if len(ip_pieces) == 4:
+            prefix = ".".join(ip_pieces[:3])
+            port = host.split(':')[1] if ':' in host else "80"
+            net_key = f"{prefix}:{port}"
+            if net_key not in target_nets:
+                target_nets[net_key] = data
+
+    # 3. 🌟 关键增强：把历史白名单里的网段也强行注入待扫池（即使本地 m3u 过期或丢失，也能继续由白名单复活）
+    for net_key, white_line in historical_white_nets.items():
+        if net_key not in target_nets:
+            prefix, port = net_key.split(':')
+            # 尝试在现有基因中找一个同端口的频道路径作为爆破模版，若没有则用默认兜底
+            sample_channel_path = "/iptv/live/1000.m3u"
+            sample_tag = f"白名单网段_{prefix}.*"
+            for h, d in all_genes.items():
+                if h.endswith(f":{port}"):
+                    sample_channel_path = d['channels'][0]['path']
+                    sample_tag = d['tag']
+                    break
+            target_nets[net_key] = {
+                "tag": sample_tag,
+                "channels": [{"path": sample_channel_path}]
+            }
 
     print(f"⚡ 阶段 1: 快速探测 {len(all_genes)} 个原始 IP 的健康状态...", flush=True)
     with concurrent.futures.ThreadPoolExecutor(max_workers=MAX_WORKERS) as executor:
@@ -102,17 +178,7 @@ def run_scan():
                 save_realtime(data['tag'], host, data['channels'])
                 final_live_hosts.add(host)
 
-    # 按照 IP 前三位归类
-    for host, data in all_genes.items():
-        ip_part = host.split(':')[0]
-        ip_pieces = ip_part.split('.')
-        if len(ip_pieces) == 4:
-            prefix = ".".join(ip_pieces[:3]) 
-            port = host.split(':')[1] if ':' in host else "80"
-            net_key = f"{prefix}:{port}"
-            if net_key not in target_nets:
-                target_nets[net_key] = data
-
+    # 4. 过滤黑名单，编排最终待深度扫描的网段
     valid_scan_nets = []
     skipped_count = 0
     processed_nets = set()
@@ -129,7 +195,7 @@ def run_scan():
         valid_scan_nets.append((net_key, data))
 
     print(f"\n📡 阶段 2: 启动 C 段全覆盖深度扫描...", flush=True)
-    print(f"📈 统计面板 -> 原始归并网段: {len(target_nets)} 个 | 🛡️ 命中黑名单跳过: {skipped_count} 个 | 🚀 实际待深度扫描网段: {len(valid_scan_nets)} 个", flush=True)
+    print(f"📈 统计面板 -> 合并后待扫网段: {len(target_nets)} 个 | 🛡️ 命中黑名单跳过: {skipped_count} 个 | 🚀 实际深度扫描网段: {len(valid_scan_nets)} 个", flush=True)
 
     current_scan_dead_hosts = []
 
@@ -138,9 +204,7 @@ def run_scan():
         tag = data['tag']
         channels = data['channels']
         
-        # 🎯 核心优化：自动将标签里的具体IP段替换为通配符 120.196.235.*
         clean_display_tag = re.sub(r'\d+\.\d+\.\d+\.\d+', f'{prefix}.*', tag)
-        
         print(f"🔍 正在地毯式扫荡网段: {clean_display_tag} (端口 {port})...", flush=True)
         
         scan_urls = [f"http://{prefix}.{i}:{port}{channels[0]['path']}" for i in range(1, 255)]
@@ -153,13 +217,14 @@ def run_scan():
                 if res_url:
                     new_host = urlparse(res_url).netloc
                     if new_host not in final_live_hosts:
-                        save_realtime(tag, new_host, channels) # 保存时使用原文件名
+                        save_realtime(tag, new_host, channels)
                         final_live_hosts.add(new_host)
                         net_rescued = True
 
         if not net_rescued:
             current_scan_dead_hosts.append(net_key)
 
+    # 5. 更新并保存黑名单 dead_hosts.txt
     os.makedirs(MD_DIR, exist_ok=True)
     formatted_current_deads = {f"{k.split(':')[0]}.x:{k.split(':')[1]}" for k in current_scan_dead_hosts}
     all_dead_set = historical_dead_sets.union(formatted_current_deads)
@@ -173,6 +238,9 @@ def run_scan():
                 parts = dead_host.split(':')
                 dead_host = f"{parts[0]}.x:{parts[1]}"
             f_dead.write(f"{dead_host}\n")
+
+    # 6. 🌟 核心沉淀：把本次所有活着的 IP 自动提炼并追加写入白名单 white_hosts.txt
+    save_white_hosts(final_live_hosts)
             
     print(f"\n✅ 智能全网段深度扫描结束！有效大表已生成: {RESULT_TXT}", flush=True)
 
