@@ -8,6 +8,7 @@ import sys
 # --- 配置区 ---
 SOURCES = [
     "https://oer.us.ci/get/jilin.m3u", 
+    "https://boyu.ccwu.cc/sub1",     
     "https://yuxx.de5.net/edcab778.m3u",	
     "https://yuxx.de5.net/33fc12a0.m3u",	
     "https://yuxx.de5.net/3c1f32b7.m3u",	
