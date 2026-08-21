@@ -28,20 +28,21 @@ jobs:
           path: private_repo
           persist-credentials: true         
 
-      # 3️⃣ 配置 Python 环境并安装依赖与 FFmpeg
-      - name: Set up Python & Install FFmpeg
+       # 配置 Python 环境并仅安装依赖（已移除 ffmpeg 安装）
+      
+
+      - name: Set up Python & Install Dependencies
         run: |
           python -m pip install --upgrade pip
           pip install httpx
-          sudo apt-get update && sudo apt-get install -y ffmpeg
 
-      # 4️⃣ 运行清洗与检测脚本：通过环境变量强行接管私库的 hotels 目录
+      # 运行纯 httpx 高效清洗脚本
       - name: Run Hotel Validation Script
         env:
           PYTHONUNBUFFERED: "1"  
           LIVE_WORKSPACE: ${{ github.workspace }}/private_repo
         run: |
-          echo "🚀 开始对私库 hotels 目录下的源进行双重有效性检测与清理..."
+          echo "🚀 开始纯 httpx 快速检测与清理..."
           python md/check_hotels.py
 
       # 5️⃣ 提交并精准推送清理后的变动到私库
