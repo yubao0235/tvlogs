@@ -2,7 +2,7 @@ name: Hotel IPTV Stream Validation & Cleanup
 
 on:
   schedule:
-    - cron: '0 2 * * *'  # 每天凌晨 2 点自动运行一次深度清洗
+    - cron: '0 2 */7 * *'  # 每天凌晨 2 点自动运行一次深度清洗
   workflow_dispatch:         # 支持手动触发
 
 concurrency:
