@@ -1,8 +1,6 @@
 name: IPTV Traffic Speed Test Only
 
 on:
-  schedule:
-    - cron: '30 2 */7 * *'  # 比如每 12 小时测速一次，与主流程错开
   workflow_dispatch:         
 
 concurrency:
