@@ -1,0 +1,98 @@
+name: Static Site Index & Sync
+
+on:
+  schedule:
+    - cron: '59 2,10,18 * * *'  # 每天定时三次自动更新
+  workflow_dispatch:           # 支持在 GitHub 后台手动点击触发
+
+concurrency:
+  group: static-site-sync-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  build_and_deploy:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout Public Repository (仅存放工作流)
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Setup Python Environment
+        uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Clone Private Repository
+        env:
+          LIVE_TOKEN: ${{ secrets.LIVE_TOKEN }}
+          LIVE_REPO: ${{ secrets.LIVE_REPO }}
+        run: |
+          if [ -z "$LIVE_TOKEN" ] || [ -z "$LIVE_REPO" ]; then
+            echo "❌ 错误: 未配置私库的 LIVE_TOKEN 或 LIVE_REPO 密钥！"
+            exit 1
+          fi
+          echo "🔄 正在克隆私库..."
+          git clone https://x-access-token:${LIVE_TOKEN}@github.com/${LIVE_REPO}.git private_source_repo
+
+      - name: Generate File Index and Organize Assets
+        run: |
+          echo "📦 正在扫描目录并生成静态文件索引 (file_index.json)..."
+          python - << 'EOF'
+          import os
+          import json
+          import time
+          import shutil
+
+          source_base = "private_source_repo"
+          target_dirs = ["hotel", "hotels", "md"]
+          all_files = []
+
+          # 1️⃣ 遍历目标文件夹，收集所有文件路径
+          for d in target_dirs:
+              disk_path = os.path.join(source_base, d)
+              if os.path.exists(disk_path):
+                  print(f"📁 正在扫描目录: {d}")
+                  for dirpath, _, filenames in os.walk(disk_path):
+                      if ".git" in dirpath or ".github" in dirpath:
+                          continue
+                      for f in filenames:
+                        full_path = os.path.join(dirpath, f)
+                        rel_from_base = os.path.relpath(full_path, source_base)
+                        rel_path = rel_from_base.replace("\\", "/")
+                        all_files.append(rel_path)
+              else:
+                  print(f"⚠️ 目录 {disk_path} 不存在")
+
+          # 2️⃣ 生成 file_index.json 给前端网页导航用
+          index_data = {
+              "updated_at": time.strftime('%Y-%m-%d %H:%M:%S'),
+              "files": sorted(all_files)
+          }
+
+          with open("file_index.json", "w", encoding="utf-8") as out:
+              json.dump(index_data, out, ensure_ascii=False)
+          print(f"✅ file_index.json 生成成功！总文件数: {len(all_files)}")
+          EOF
+
+      - name: Sync and Commit to Private Repo
+        run: |
+          cd private_source_repo
+          git config --local user.email "github-actions[bot]@users.noreply.github.com"
+          git config --local user.name "github-actions[bot]"
+          
+          # 将生成的 file_index.json 复制到私库根目录
+          cp ../file_index.json ./
+          
+          git add file_index.json md/index.py 2>/dev/null || true
+          git add hotel/ hotels/ md/ 2>/dev/null || true
+          
+          if git diff --staged --quiet; then
+            echo "✅ 私库已经是最新，没有需要提交的变动。"
+          else
+            git commit -m "🔄 [自动同步] 更新静态索引与资源: $(date +'%Y-%m-%d %H:%M') [skip ci]"
+            git pull --rebase -X ours origin main || true
+            git push origin main
+            echo "✅ 私库内容已成功更新并推送！"
+          fi
