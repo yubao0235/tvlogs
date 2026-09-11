@@ -2,7 +2,7 @@ name: Full Private Repo KV Auto-Sync
 
 on:
   schedule:
-    - cron: '10 * * * *'  # 每8 小时全自动洗版测速一次
+    - cron: '59 2,10,18 * * *'  #     
   workflow_dispatch:          # 支持手动触发
 
 concurrency:
